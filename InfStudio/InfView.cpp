@@ -14,10 +14,6 @@ BOOL CInfView::PreTranslateMessage(MSG* pMsg) {
 	return FALSE;
 }
 
-void CInfView::OnFinalMessage(HWND /*hWnd*/) {
-	delete this;
-}
-
 LRESULT CInfView::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
 	DefWindowProc();
 	StyleSetFont(STYLE_DEFAULT, "Consolas");

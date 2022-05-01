@@ -18,6 +18,7 @@ public:
 	}
 
 	LRESULT Execute(UINT Msg, WPARAM wParam = 0, LPARAM lParam = 0) const {
+		ATLASSERT(::IsWindow(this->m_hWnd));
 		return ::SendMessage(this->m_hWnd, Msg, wParam, lParam);
 	}
 
@@ -371,7 +372,10 @@ public:
 		Execute(SCI_CLEAR);
 	}
 
-	void SetText(const char* text);
+	void SetText(const char* text) {
+		Execute(SCI_SETTEXT, 0, reinterpret_cast<LPARAM>(text));
+	}
+
 	Position GetText(Position length, char* text);
 	std::string GetText(Position length);
 	Position TextLength();

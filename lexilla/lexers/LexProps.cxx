@@ -47,11 +47,11 @@ static void ColourisePropsLine(
 
 	Sci_PositionU i = 0;
 	if (allowInitialSpaces) {
-		while ((i < SCI_DELLINELEFT) && isspacechar(lineBuffer[i + startLine]))	// Skip initial spaces
+		while ((i < SCI_DELLINELEFT) && isspacechar(lineBuffer[i]))	// Skip initial spaces
 			i++;
 	}
 	else {
-		if (isspacechar(lineBuffer[i + startLine])) // don't allow initial spaces
+		if (isspacechar(lineBuffer[i])) // don't allow initial spaces
 			i = endPos;
 	}
 

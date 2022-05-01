@@ -26,6 +26,7 @@ extern CAppModule _Module;
 #include <atltypes.h>
 #include <atlsplit.h>
 #include <SetupAPI.h>
+#include <commoncontrols.h>
 
 #include <vector>
 #include <unordered_map>

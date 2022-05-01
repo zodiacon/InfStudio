@@ -5,6 +5,8 @@
 #include "resource.h"
 #include "MainFrm.h"
 #include "Scintilla.h"
+#include <ThemeHelper.h>
+#include <Theme.h>
 
 CAppModule _Module;
 
@@ -28,13 +30,17 @@ int Run(LPCTSTR /*lpstrCmdLine*/ = nullptr, int nCmdShow = SW_SHOWDEFAULT) {
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lpstrCmdLine, int nCmdShow) {
-	HRESULT hRes = ::CoInitialize(nullptr);
+	HRESULT hRes = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 	ATLASSERT(SUCCEEDED(hRes));
 
 	AtlInitCommonControls(ICC_BAR_CLASSES | ICC_COOL_CLASSES | ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES);
 
 	hRes = _Module.Init(nullptr, hInstance);
 	ATLASSERT(SUCCEEDED(hRes));
+
+	ThemeHelper::Init();
+	static Theme defTheme;
+	ThemeHelper::SetCurrentTheme(defTheme);
 
 	Scintilla_RegisterClasses(_Module.GetModuleInstance());
 

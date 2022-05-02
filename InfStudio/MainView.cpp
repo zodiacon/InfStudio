@@ -186,7 +186,7 @@ int CMainView::AddKnownDirective(HTREEITEM hParent, PCWSTR section, PCWSTR direc
 	std::unordered_set<std::wstring> names;
 	HTREEITEM hSection = FindChild(m_Tree, hParent, section);
 
-	for (auto& [key, value] : m_Inf.GetSectionCompactLines(section)) {
+	for (auto const& [key, value] : m_Inf.GetSectionCompactLines(section)) {
 		if (_wcsicmp(key.c_str(), directive) == 0) {
 			size_t pos = 0;
 			while (true) {

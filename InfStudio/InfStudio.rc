@@ -159,7 +159,7 @@ IDI_DEVICES             ICON                    "res\\devices.ico"
 
 IDD_ABOUTBOX DIALOGEX 0, 0, 163, 73
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "About"
+CAPTION "About INF Studio"
 FONT 9, "Segoe UI", 0, 0, 0x0
 BEGIN
     DEFPUSHBUTTON   "OK",IDOK,61,52,40,14
@@ -218,8 +218,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,1
- PRODUCTVERSION 1,0,0,1
+ FILEVERSION 0,1,0,0
+ PRODUCTVERSION 0,1,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -232,15 +232,16 @@ VS_VERSION_INFO VERSIONINFO
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
-        BLOCK "040904B0"
+        BLOCK "040904b0"
         BEGIN
-            VALUE "FileDescription", "InfStudio Module"
-            VALUE "FileVersion", "1, 0, 0, 1"
+            VALUE "CompanyName", "Scorpio Software"
+            VALUE "FileDescription", "INF Studio - View/Edit INF Files"
+            VALUE "FileVersion", "0.1.0.0"
             VALUE "InternalName", "InfStudio"
-            VALUE "LegalCopyright", "Copyright 2022"
+            VALUE "LegalCopyright", "©2022 Pavel Yosifovich"
             VALUE "OriginalFilename", "InfStudio.exe"
-            VALUE "ProductName", "InfStudio Module"
-            VALUE "ProductVersion", "1, 0, 0, 1"
+            VALUE "ProductName", "INF Studio"
+            VALUE "ProductVersion", "0.1.0.0"
         END
     END
     BLOCK "VarFileInfo"

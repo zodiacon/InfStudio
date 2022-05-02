@@ -22,6 +22,7 @@ public:
 	virtual BOOL OnIdle();
 
 	BEGIN_MSG_MAP(CMainFrame)
+		NOTIFY_CODE_HANDLER(TBVN_PAGEACTIVATED, OnPageActivated)
 		MESSAGE_HANDLER(WM_CREATE, OnCreate)
 		MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
 		COMMAND_ID_HANDLER(ID_APP_EXIT, OnFileExit)
@@ -31,6 +32,7 @@ public:
 		COMMAND_ID_HANDLER(ID_APP_ABOUT, OnAppAbout)
 		COMMAND_ID_HANDLER(ID_WINDOW_CLOSE, OnWindowClose)
 		COMMAND_ID_HANDLER(ID_WINDOW_CLOSE_ALL, OnWindowCloseAll)
+		COMMAND_ID_HANDLER(ID_FILE_RUNASADMINISTRATOR, OnRunAsAdmin)
 		COMMAND_RANGE_HANDLER(ID_WINDOW_TABFIRST, ID_WINDOW_TABLAST, OnWindowActivate)
 		if (uMsg == WM_COMMAND && m_view.GetPageCount() > 0) {
 			int page = m_view.GetActivePage();
@@ -50,6 +52,7 @@ private:
 	CUpdateUIBase& GetUI() override;
 	bool AddToolBar(HWND tb) override;
 	void SetStatusText(int index, PCWSTR text) override;
+	HICON GetInfIcon() const override;
 
 	void InitMenu();
 
@@ -68,6 +71,11 @@ private:
 	LRESULT OnWindowClose(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnWindowCloseAll(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnWindowActivate(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnPageActivated(int, LPNMHDR hdr, BOOL&);
+	LRESULT OnRunAsAdmin(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 
 	CCustomTabView m_view;
+	CIcon m_InfIcon;
+	CMultiPaneStatusBarCtrl m_StatusBar;
+	int m_CurrentPage{ -1 };
 };

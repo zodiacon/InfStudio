@@ -14,6 +14,11 @@ BOOL CInfView::PreTranslateMessage(MSG* pMsg) {
 	return FALSE;
 }
 
+LRESULT CInfView::OnSetFocus(UINT, WPARAM, LPARAM, BOOL&) {
+	Focus();
+	return 0;
+}
+
 LRESULT CInfView::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
 	DefWindowProc();
 	StyleSetFont(STYLE_DEFAULT, "Consolas");

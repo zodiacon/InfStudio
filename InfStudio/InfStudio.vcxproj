@@ -240,10 +240,25 @@
   <ItemGroup>
     <Image Include="res\copy.ico" />
     <Image Include="res\cut.ico" />
+    <Image Include="res\device.ico" />
+    <Image Include="res\devices.ico" />
+    <Image Include="res\error.ico" />
+    <Image Include="res\file-delete.ico" />
+    <Image Include="res\file-write.ico" />
+    <Image Include="res\folder_into.ico" />
     <Image Include="res\InfStudio.ico" />
     <Image Include="res\open.ico" />
     <Image Include="res\paste.ico" />
     <Image Include="res\pin.ico" />
+    <Image Include="res\redo.ico" />
+    <Image Include="res\registry_delete.ico" />
+    <Image Include="res\registry_edit.ico" />
+    <Image Include="res\save.ico" />
+    <Image Include="res\save_as.ico" />
+    <Image Include="res\section.ico" />
+    <Image Include="res\sections.ico" />
+    <Image Include="res\undo.ico" />
+    <Image Include="res\version.ico" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

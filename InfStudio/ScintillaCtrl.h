@@ -22,15 +22,26 @@ public:
 		return ::SendMessage(this->m_hWnd, Msg, wParam, lParam);
 	}
 
-	Position LineStart(Line line);
-	Position LineEnd(Line line);
-	Span SelectionSpan();
-	Span TargetSpan();
+	Position LineStart(Line line) const;
+	Position LineEnd(Line line) const;
+	Span SelectionSpan() const {
+		return SelectionEnd() - SelectionStart();
+	}
+
+	bool IsSelectionEmpty() const {
+		return (bool)Execute(SCI_GETSELECTIONEMPTY);
+	}
+
+	int SelectionsCount() const {
+		return (int)Execute(SCI_GETSELECTIONS);
+	}
+
+	Span TargetSpan() const;
 	void SetTarget(Span span);
 	void ColouriseAll();
-	char CharacterAt(Position position);
+	char CharacterAt(Position position) const;
 	int UnsignedStyleAt(Position position);
-	std::string StringOfSpan(Span span);
+	std::string StringOfSpan(Span span) const;
 	Position ReplaceTarget(std::string_view text);
 	Position ReplaceTargetRE(std::string_view text);
 	Position SearchInTarget(std::string_view text);
@@ -40,21 +51,50 @@ public:
 	void AddStyledText(Position length, const char* c);
 	void InsertText(Position pos, const char* text);
 	void ChangeInsertion(Scintilla::Position length, const char* text);
-	void ClearAll();
+	void ClearAll() {
+		Execute(SCI_CLEARALL);
+	}
 	void DeleteRange(Scintilla::Position start, Scintilla::Position lengthDelete);
 	void ClearDocumentStyle();
-	Scintilla::Position Length();
-	int CharAt(Position pos);
-	Scintilla::Position CurrentPos();
-	Scintilla::Position Anchor();
-	int StyleAt(Scintilla::Position pos);
-	int StyleIndexAt(Position pos);
-	void Redo();
-	void SetUndoCollection(bool collectUndo);
-	void SelectAll();
-	void SetSavePoint();
-	Position GetStyledText(void* tr);
-	bool CanRedo();
+	
+	Position Length() const {
+		return (Position)Execute(SCI_GETLENGTH);
+	}
+
+	int CharAt(Position pos) const {
+		return (int)Execute(SCI_GETCHARAT, pos);
+	}
+	Position CurrentPos() const {
+		return (Position)Execute(SCI_GETCURRENTPOS);
+	}
+	Position Anchor() const {
+		return (Position)Execute(SCI_GETANCHOR);
+	}
+
+	int StyleAt(Position pos) const {
+		return (int)Execute(SCI_GETSTYLEAT, pos);
+	}
+	int StyleIndexAt(Position pos) const {
+		return (int)Execute(SCI_GETSTYLEINDEXAT, pos);
+	}
+	void Redo() {
+		Execute(SCI_REDO);
+	}
+	void SetUndoCollection(bool collectUndo) {
+		Execute(SCI_SETUNDOCOLLECTION, collectUndo);
+	}
+	void SelectAll() {
+		Execute(SCI_SELECTALL);
+	}
+	void SetSavePoint() {
+		Execute(SCI_SETSAVEPOINT);
+	}
+
+	Position GetStyledText(void* tr) const;
+	bool CanRedo() const {
+		return Execute(SCI_CANREDO);
+	}
+
 	Line MarkerLineFromHandle(int markerHandle);
 	void MarkerDeleteHandle(int markerHandle);
 	int MarkerHandleFromLine(Line line, int which);
@@ -67,7 +107,10 @@ public:
 	Position PositionFromPoint(int x, int y);
 	Position PositionFromPointClose(int x, int y);
 	void GotoLine(Line line);
-	void GotoPos(Position caret);
+	void GotoPos(Position caret) {
+		Execute(SCI_GOTOPOS, caret);
+	}
+
 	void SetAnchor(Position anchor);
 	Position GetCurLine(Position length, char* text);
 	std::string GetCurLine(Position length);
@@ -87,10 +130,14 @@ public:
 	void AddTabStop(Line line, int x);
 	int GetNextTabStop(Line line, int x);
 	void SetCodePage(int codePage);
+	void Focus(bool focus = true) {
+		Execute(SCI_SETFOCUS, focus);
+	}
+
 	void SetFontLocale(const char* localeName);
 	int FontLocale(char* localeName);
-	std::string FontLocale();
-	Scintilla::IMEInteraction IMEInteraction();
+	std::string FontLocale() const;
+	Scintilla::IMEInteraction IMEInteraction() const;
 	void SetIMEInteraction(Scintilla::IMEInteraction imeInteraction);
 	void MarkerDefine(int markerNumber, Scintilla::MarkerSymbol markerSymbol);
 	void MarkerSetFore(int markerNumber, Colour fore);
@@ -286,7 +333,12 @@ public:
 	void SetLineIndentation(Line line, int indentation);
 	int LineIndentation(Line line);
 	Position LineIndentPosition(Line line);
-	Position Column(Position pos);
+	Position Column(Position pos) const {
+		return (Position)Execute(SCI_GETCOLUMN, pos);
+	}
+	Position LineNumber(Position pos) const {
+		return (Position)Execute(SCI_LINEFROMPOSITION, pos);
+	}
 	Position CountCharacters(Position start, Position end);
 	Position CountCodeUnits(Position start, Position end);
 	void SetHScrollBar(bool visible);
@@ -301,17 +353,32 @@ public:
 	bool IsReadOnly() {
 		return Execute(SCI_GETREADONLY);
 	}
-	void SetCurrentPos(Position caret);
-	void SetSelectionStart(Position anchor);
-	Position SelectionStart();
-	void SetSelectionEnd(Position caret);
+	void SetCurrentPos(Position caret) {
+		Execute(SCI_SETCURRENTPOS, caret);
+	}
+	void SetSelectionStart(Position anchor) {
+		Execute(SCI_SETSELECTIONSTART, anchor);
+	}
+	Position SelectionStart() const {
+		return (Position)Execute(SCI_GETSELECTIONNANCHOR);
+	}
+
+	void SetSelectionEnd(Position caret) {
+		Execute(SCI_SETSELECTIONEND, caret);
+	}
 	Position SelectionEnd();
 	void SetEmptySelection(Position caret);
 	void SetPrintMagnification(int magnification);
 	int PrintMagnification();
 	void SetPrintColourMode(Scintilla::PrintOption mode);
 	Scintilla::PrintOption PrintColourMode();
-	Position FindText(Scintilla::FindOption searchFlags, void* ft);
+	Position FindText(Scintilla::FindOption searchFlags, char const* text) {
+		Sci_TextToFind ttf{ };
+		ttf.chrg.cpMax = Length();
+		ttf.lpstrText = text;
+		return (Position)Execute(SCI_FINDTEXT, static_cast<WPARAM>(searchFlags), reinterpret_cast<LPARAM>(&ttf));
+	}
+
 	Position FormatRange(bool draw, void* fr);
 	Line FirstVisibleLine();
 	Position GetLine(Line line, char* text);
@@ -332,8 +399,13 @@ public:
 	void HideSelection(bool hide);
 	int PointXFromPosition(Position pos);
 	int PointYFromPosition(Position pos);
-	Line LineFromPosition(Position pos);
-	Position PositionFromLine(Line line);
+	Line LineFromPosition(Position pos) const {
+		return (Line)Execute(SCI_GETLINEENDPOSITION, pos);
+	}
+
+	Position PositionFromLine(Line line) const {
+		return (Position)Execute(SCI_POSITIONFROMLINE, line);
+	}
 	void LineScroll(Position columns, Line lines);
 	void ScrollCaret();
 	void ScrollRange(Position secondary, Position primary);
@@ -342,10 +414,10 @@ public:
 		Execute(SCI_SETREADONLY, readOnly);
 	}
 	void Null();
-	bool CanPaste() {
+	bool CanPaste() const {
 		return Execute(SCI_CANPASTE);
 	}
-	bool CanUndo() {
+	bool CanUndo() const {
 		return Execute(SCI_CANUNDO);
 	}
 	void EmptyUndoBuffer() {
@@ -376,9 +448,9 @@ public:
 		Execute(SCI_SETTEXT, 0, reinterpret_cast<LPARAM>(text));
 	}
 
-	Position GetText(Position length, char* text);
-	std::string GetText(Position length);
-	Position TextLength();
+	Position GetText(Position length, char* text) const;
+	std::string GetText(Position length) const;
+	Position TextLength() const;
 };
 
 using CScintillaCtrl = CScintillaCtrlT<CWindow>;
@@ -389,6 +461,10 @@ class CScintillaCommands {
 	ALT_MSG_MAP(1)
 		COMMAND_ID_HANDLER(ID_EDIT_COPY, OnCopy)
 		COMMAND_ID_HANDLER(ID_EDIT_PASTE, OnPaste)
+		COMMAND_ID_HANDLER(ID_EDIT_CUT, OnCut)
+		COMMAND_ID_HANDLER(ID_EDIT_UNDO, OnUndo)
+		COMMAND_ID_HANDLER(ID_EDIT_REDO, OnRedo)
+		COMMAND_ID_HANDLER(ID_EDIT_CLEAR_ALL, OnClearAll)
 	END_MSG_MAP()
 
 	LRESULT OnPaste(WORD, WORD, HWND, BOOL&) {
@@ -398,6 +474,26 @@ class CScintillaCommands {
 
 	LRESULT OnCopy(WORD, WORD, HWND, BOOL&) {
 		static_cast<T*>(this)->Copy();
+		return 0;
+	}
+
+	LRESULT OnCut(WORD, WORD, HWND, BOOL&) {
+		static_cast<T*>(this)->Cut();
+		return 0;
+	}
+
+	LRESULT OnUndo(WORD, WORD, HWND, BOOL&) {
+		static_cast<T*>(this)->Undo();
+		return 0;
+	}
+
+	LRESULT OnRedo(WORD, WORD, HWND, BOOL&) {
+		static_cast<T*>(this)->Redo();
+		return 0;
+	}
+
+	LRESULT OnClearAll(WORD, WORD, HWND, BOOL&) {
+		static_cast<T*>(this)->ClearAll();
 		return 0;
 	}
 

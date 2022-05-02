@@ -33,24 +33,24 @@ int wmain(int argc, wchar_t const* argv[]) {
 		printf("Sections:\n");
 		for (auto const& sec : inf.GetSectionNames()) {
 			printf("\t%ws\n", sec.c_str());
-			for (auto& [key, text] : inf.GetSectionCompactLines(sec.c_str())) {
-				if (key.empty())
-					printf("\t\t%ws\n", text.c_str());
-				else
-					printf("\t\t%ws = %ws\n", key.c_str(), text.c_str());
-			}
+			//for (auto& [key, text] : inf.GetSectionCompactLines(sec.c_str())) {
+			//	if (key.empty())
+			//		printf("\t\t%ws\n", text.c_str());
+			//	else
+			//		printf("\t\t%ws = %ws\n", key.c_str(), text.c_str());
+			//}
 		}
 
-		printf("Sections (original text):\n");
-		for (auto const& sec : inf.GetSectionNames()) {
-			printf("\t%ws\n", sec.c_str());
-			for (auto& [key, text] : inf.GetSectionLines(sec.c_str())) {
-				if (key.empty())
-					printf("\t\t%ws\n", text.c_str());
-				else
-					printf("\t\t%ws = %ws\n", key.c_str(), text.c_str());
-			}
-		}
+		//printf("Sections (original text):\n");
+		//for (auto const& sec : inf.GetSectionNames()) {
+		//	printf("\t%ws\n", sec.c_str());
+		//	for (auto& [key, text] : inf.GetSectionLines(sec.c_str())) {
+		//		if (key.empty())
+		//			printf("\t\t%ws\n", text.c_str());
+		//		else
+		//			printf("\t\t%ws = %ws\n", key.c_str(), text.c_str());
+		//	}
+		//}
 	}
 
 	inf.Close();

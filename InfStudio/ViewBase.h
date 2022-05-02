@@ -3,7 +3,9 @@
 #include "Interfaces.h"
 
 template<typename T>
-class CViewBase : public CFrameWindowImpl<T, CWindow, CControlWinTraits> {
+class CViewBase : 
+	public IView,
+	public CFrameWindowImpl<T, CWindow, CControlWinTraits> {
 	using BaseFrame = CFrameWindowImpl<T, CWindow, CControlWinTraits>;
 public:
 	CViewBase(IMainFrame* frame) : m_pFrame(frame) {}
@@ -16,6 +18,14 @@ public:
 		return m_pFrame;
 	}
 
+	CUpdateUIBase& UI() {
+		return m_pFrame->GetUI();
+	}
+
+	void PageActivated(bool activate) {
+		static_cast<T*>(this)->OnActivated(activate);
+	}
+
 	BEGIN_MSG_MAP(CViewBase)
 		CHAIN_MSG_MAP(BaseFrame)
 	END_MSG_MAP()
@@ -26,6 +36,7 @@ private:
 	//	LRESULT CommandHandler(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 	//	LRESULT NotifyHandler(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/)
 
+	void OnActivated(bool) {}
 
 private:
 	IMainFrame* m_pFrame;

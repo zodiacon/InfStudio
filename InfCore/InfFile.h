@@ -17,6 +17,9 @@ public:
 	std::vector<std::wstring> GetSectionNames() const;
 	std::vector<std::pair<std::wstring, std::wstring>> GetSectionCompactLines(PCWSTR section) const;
 	std::vector<std::pair<std::wstring, std::wstring>> GetSectionLines(PCWSTR section) const;
+	std::wstring GetStringValue(PCWSTR section, PCWSTR key, UINT index = 0) const;
+	bool SectionExists(PCWSTR name) const;
+	static std::vector<std::wstring> GetStringPairs(std::wstring const& src, wchar_t ch = L',', wchar_t replaced = L'.');
 
 private:
 	bool Init();

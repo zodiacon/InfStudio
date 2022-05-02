@@ -29,9 +29,13 @@ BOOL CMainFrame::OnIdle() {
 
 LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
 	CreateSimpleStatusBar();
+	m_StatusBar.SubclassWindow(m_hWndStatusBar);
+	int parts[] = { 200, 400, 600, 800, 1000 };
+	m_StatusBar.SetParts(_countof(parts), parts);
 
 	ToolBarButtonInfo const buttons[] = {
 		{ ID_FILE_OPEN, IDI_OPEN },
+		{ ID_FILE_SAVE, IDI_SAVE },
 		{ 0 },
 		{ ID_EDIT_COPY, IDI_COPY },
 		{ ID_EDIT_CUT, IDI_CUT },
@@ -68,8 +72,10 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 		WORD icon = 0;
 		wcscat_s(path, fd.cFileName);
 		auto hIcon = ::ExtractAssociatedIcon(_Module.GetModuleInstance(), path, &icon);
-		if (hIcon)
+		if (hIcon) {
 			images.AddIcon(hIcon);
+			m_InfIcon.Attach(hIcon);
+		}
 	}
 	m_view.SetImageList(images);
 
@@ -94,6 +100,10 @@ void CMainFrame::InitMenu() {
 		{ ID_EDIT_PASTE, IDI_PASTE },
 		{ ID_FILE_OPEN, IDI_OPEN },
 		{ ID_EDIT_CUT, IDI_CUT },
+		{ ID_EDIT_UNDO, IDI_UNDO },
+		{ ID_EDIT_REDO, IDI_REDO },
+		{ ID_FILE_SAVE, IDI_SAVE },
+		{ ID_FILE_SAVE_AS, IDI_SAVE_AS },
 		{ ID_OPTIONS_ALWAYSONTOP, IDI_PIN },
 		{ ID_FILE_RUNASADMINISTRATOR, 0, IconHelper::GetShieldIcon() },
 	};
@@ -165,8 +175,13 @@ LRESULT CMainFrame::OnAppAbout(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCt
 
 LRESULT CMainFrame::OnWindowClose(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
 	int nActivePage = m_view.GetActivePage();
-	if (nActivePage != -1)
-		m_view.RemovePage(nActivePage);
+	if (nActivePage != -1) {
+		auto view = (IView*)m_view.GetPageData(nActivePage);
+		ATLASSERT(view);
+		if (view->CanClose()) {
+			m_view.RemovePage(nActivePage);
+		}
+	}
 	else
 		::MessageBeep((UINT)-1);
 
@@ -203,5 +218,32 @@ bool CMainFrame::AddToolBar(HWND tb) {
 }
 
 void CMainFrame::SetStatusText(int index, PCWSTR text) {
+	m_StatusBar.SetText(index, text);
 }
 
+HICON CMainFrame::GetInfIcon() const {
+	return m_InfIcon.m_hIcon;
+}
+
+LRESULT CMainFrame::OnPageActivated(int, LPNMHDR hdr, BOOL&) {
+	auto page = static_cast<int>(hdr->idFrom);
+	if (m_CurrentPage >= 0 && m_CurrentPage < m_view.GetPageCount()) {
+		((IView*)m_view.GetPageData(m_CurrentPage))->PageActivated(false);
+	}
+	if (page >= 0) {
+		auto view = (IView*)m_view.GetPageData(page);
+		ATLASSERT(view);
+		view->PageActivated(true);
+	}
+	m_CurrentPage = page;
+
+	return 0;
+}
+
+LRESULT CMainFrame::OnRunAsAdmin(WORD, WORD, HWND, BOOL&) {
+	if (SecurityHelper::RunElevated(nullptr, true)) {
+		SendMessage(WM_CLOSE);
+	}
+
+	return 0;
+}

@@ -102,6 +102,44 @@ std::vector<std::pair<std::wstring, std::wstring>> InfFile::GetSectionLines(PCWS
 	return lines;
 }
 
+bool InfFile::SectionExists(PCWSTR name) const {
+	INFCONTEXT ctx;
+	return ::SetupFindFirstLine(m_inf, name, nullptr, &ctx);
+}
+
+std::vector<std::wstring> InfFile::GetStringPairs(std::wstring const& src, wchar_t ch, wchar_t replaced) {
+	// find base string
+	auto pos = src.find(ch);
+	if (pos == std::wstring::npos)
+		return {};
+
+	auto base = src.substr(0, pos);
+	pos++;
+	std::vector<std::wstring> result;
+	while (true) {
+		auto pos2 = src.find(ch, pos);
+		if (pos2 == std::wstring::npos) {
+			result.emplace_back(base + replaced + src.substr(pos));
+			break;
+		}
+		result.emplace_back(base + replaced + src.substr(pos, pos2 - pos));
+		pos = pos2 + 1;
+	}
+
+	return result;
+}
+
+std::wstring InfFile::GetStringValue(PCWSTR section, PCWSTR key, UINT index) const {
+	INFCONTEXT ctx;
+	std::wstring value;
+	if (::SetupFindFirstLine(m_inf, section, key, &ctx)) {
+		WCHAR buffer[512];
+		if (::SetupGetStringField(&ctx, index, buffer, _countof(buffer), nullptr))
+			value = buffer;
+	}
+	return value;
+}
+
 bool InfFile::Init() {
 	assert(m_inf != INVALID_HANDLE_VALUE);
 	if (m_infoBuffer)

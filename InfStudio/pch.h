@@ -32,6 +32,7 @@ extern CAppModule _Module;
 #include <unordered_map>
 #include <memory>
 #include <format>
+#include <unordered_set>
 
 #include "ScintillaTypes.h"
 #include "ILexer.h"

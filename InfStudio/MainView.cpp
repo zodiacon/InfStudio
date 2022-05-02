@@ -53,7 +53,7 @@ bool CMainView::OnTreeDoubleClick(HWND, HTREEITEM hItem) {
 			m_InfView.SetSelectionStart(pos);
 			m_InfView.SetSelectionEnd(pos + text.GetLength() + 2);
 			PostMessage(WM_SETFOCUS);
-			return false;
+			return true;
 		}
 	}
 	return false;
@@ -112,21 +112,24 @@ void CMainView::AnalyzeAndBuild(HTREEITEM hRoot) {
 			for (auto& model : InfFile::GetStringPairs(value)) {
 				auto hModel = InsertTreeItem(m_Tree, model.c_str(), TreeIconIndex::Model, NodeType::Model, hMfg);
 				for (auto& [key, value] : m_Inf.GetSectionCompactLines(model.c_str())) {
-					// search for AddReg, CopyFiles, DelReg, DelFiles, ...
-					if (_wcsicmp(key.c_str(), L"AddReg") == 0) {
-						size_t pos = 0;
-						while (true) {
-							std::wstring name;
-							auto comma = value.find(L',', pos);
-							if (comma == std::wstring::npos) {
-								name = value.substr(pos);
-							}
-							else {
-								name = value.substr(pos, comma - pos);
-							}
-							if (comma == std::wstring::npos)
-								break;
-							InsertTreeItem(m_Tree, name.c_str(), TreeIconIndex::AddReg, NodeType::AddReg, hModel);
+					auto comma = value.find(L',');
+					if (comma != std::wstring::npos) {
+						auto section = value.substr(0, comma);
+						static struct {
+							PCWSTR Name;
+							TreeIconIndex Icon;
+							NodeType Type;
+						} directives[] = {
+							{ L"CopyFiles", TreeIconIndex::CopyFiles, NodeType::CopyFiles },
+							{ L"DelFiles", TreeIconIndex::DelFiles, NodeType::DelFiles },
+							{ L"AddReg", TreeIconIndex::AddReg, NodeType::AddReg },
+							{ L"DelReg", TreeIconIndex::DelReg, NodeType::DelReg },
+						};
+						for (auto& directive : directives) {
+							AddKnownDirective(hModel, section.c_str(), directive.Name, directive.Icon, directive.Type);
+							AddKnownDirective(hModel, (section + L".NT").c_str(), directive.Name, directive.Icon, directive.Type);
+							AddKnownDirective(hModel, (section + L"Ntamd64").c_str(), directive.Name, directive.Icon, directive.Type);
+							AddKnownDirective(hModel, (section + L".Hw.NT").c_str(), directive.Name, directive.Icon, directive.Type);
 						}
 					}
 				}
@@ -135,7 +138,7 @@ void CMainView::AnalyzeAndBuild(HTREEITEM hRoot) {
 	}
 
 	//
-	// dump all sections
+	// add all sections
 	//
 	auto hSections = InsertTreeItem(m_Tree, L"All Sections", TreeIconIndex::Sections, NodeType::Sections, hRoot);
 	for (auto& sec : m_Inf.GetSectionNames()) {
@@ -165,7 +168,7 @@ LRESULT CMainView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 
 		UINT icons[] = {
 			IDI_SECTIONS, IDI_SECTION, IDI_REG_EDIT, IDI_REG_DELETE, IDI_DISK_EDIT, IDI_DISK_DELETE, IDI_VERSION,
-			IDI_DEVICES, IDI_DEVICE, 
+			IDI_DEVICES, IDI_DEVICE,
 		};
 		for (auto icon : icons)
 			images.AddIcon(AtlLoadIconImage(icon, 0, m_TreeIconSize, m_TreeIconSize));
@@ -177,6 +180,42 @@ LRESULT CMainView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 
 	return 0;
 }
+
+int CMainView::AddKnownDirective(HTREEITEM hParent, PCWSTR section, PCWSTR directive, TreeIconIndex icon, NodeType type) {
+	int count = 0;
+	std::unordered_set<std::wstring> names;
+	HTREEITEM hSection = FindChild(m_Tree, hParent, section);
+
+	for (auto& [key, value] : m_Inf.GetSectionCompactLines(section)) {
+		if (_wcsicmp(key.c_str(), directive) == 0) {
+			size_t pos = 0;
+			while (true) {
+				std::wstring name;
+				auto comma = value.find(L',', pos);
+				if (comma == std::wstring::npos) {
+					name = value.substr(pos);
+				}
+				else {
+					name = value.substr(pos, comma - pos);
+					pos = comma + 1;
+				}
+				ATLASSERT(!name.empty());
+				if (hSection == nullptr) {
+					hSection = InsertTreeItem(m_Tree, section, TreeIconIndex::Section, NodeType::Section, hParent, TVI_SORT);
+				}
+				if (!names.contains(name)) {
+					InsertTreeItem(m_Tree, name.c_str(), icon, type, hSection, TVI_SORT);
+					names.insert(std::move(name));
+					count++;
+				}
+				if (comma == std::wstring::npos)
+					break;
+			}
+		}
+	}
+	return count;
+}
+
 
 LRESULT CMainView::OnSetFocus(UINT, WPARAM, LPARAM, BOOL&) {
 	m_InfView.SetFocus();

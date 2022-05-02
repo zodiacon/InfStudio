@@ -59,7 +59,7 @@ private:
 		Section,
 		AddReg,
 		DelReg,
-		AddFiles,
+		CopyFiles,
 		DelFiles,
 		Version,
 		Models,
@@ -70,6 +70,7 @@ private:
 	bool DoSave(PCWSTR path);
 	void BuildTree();
 	void AnalyzeAndBuild(HTREEITEM hRoot);
+	int AddKnownDirective(HTREEITEM hParent, PCWSTR section, PCWSTR directive, TreeIconIndex icon, NodeType type);
 
 	LRESULT OnSave(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);

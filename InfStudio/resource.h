@@ -24,7 +24,6 @@
 #define IDI_DEST_DIR                    218
 #define IDI_VERSION                     219
 #define IDI_DEVICE                      220
-#define IDI_ICON2                       221
 #define IDI_DEVICES                     221
 #define ID_WINDOW_CLOSE                 32772
 #define ID_WINDOW_CLOSE_ALL             32773
@@ -34,13 +33,16 @@
 #define ID_OPTIONS_FONT                 32778
 #define ID_OPTIONS_DARKMODE             32779
 #define ID_EDIT_CLEARALL                32780
+#define ID_INF_VALIDATE                 32781
+#define ID_FILE_RECENTFILES             32782
+#define ID_RECENTFILES_                 32783
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        222
-#define _APS_NEXT_COMMAND_VALUE         32781
+#define _APS_NEXT_COMMAND_VALUE         32784
 #define _APS_NEXT_CONTROL_VALUE         1000
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

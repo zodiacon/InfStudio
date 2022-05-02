@@ -13,7 +13,7 @@
 #include "IconHelper.h"
 #include "ThemeHelper.h"
 
-const int WINDOW_MENU_POSITION = 4;
+const int WINDOW_MENU_POSITION = 5;
 
 BOOL CMainFrame::PreTranslateMessage(MSG* pMsg) {
 	if (CFrameWindowImpl<CMainFrame>::PreTranslateMessage(pMsg))
@@ -28,6 +28,10 @@ BOOL CMainFrame::OnIdle() {
 }
 
 LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
+	auto loaded = s_Settings.LoadFromKey(L"SOFTWARE\\ScorpioSoftware\\InfStudio");
+	if (loaded) {
+		s_recentFiles.Set(s_Settings.RecentFiles());
+	}
 	CreateSimpleStatusBar();
 	m_StatusBar.SubclassWindow(m_hWndStatusBar);
 	int parts[] = { 200, 400, 600, 800, 1000 };
@@ -80,6 +84,8 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	m_view.SetImageList(images);
 
 	InitMenu();
+	SetAlwaysOnTop();
+	UpdateRecentFilesMenu();
 
 	// register object for message filtering and idle updates
 	CMessageLoop* pLoop = _Module.GetMessageLoop();
@@ -118,7 +124,8 @@ void CMainFrame::InitMenu() {
 }
 
 LRESULT CMainFrame::OnDestroy(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& bHandled) {
-	// unregister message filtering and idle updates
+	s_Settings.Save();
+
 	CMessageLoop* pLoop = _Module.GetMessageLoop();
 	ATLASSERT(pLoop != NULL);
 	pLoop->RemoveMessageFilter(this);
@@ -145,14 +152,7 @@ LRESULT CMainFrame::OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCt
 	CSimpleFileDialog dlg(TRUE, L"inf", nullptr, OFN_EXPLORER | OFN_ENABLESIZING, L"INF Files\0*.inf\0");
 	ThemeHelper::Suspend();
 	if (IDOK == dlg.DoModal()) {
-		auto pView = new CMainView(this);
-		pView->Create(m_view, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
-		if (pView->OpenFile(dlg.m_szFileName)) {
-			m_view.AddPage(pView->m_hWnd, dlg.m_szFileTitle, 0, pView);
-		}
-		else {
-			pView->DestroyWindow();
-		}
+		DoFileOpen(dlg.m_szFileName, dlg.m_szFileTitle);
 	}
 	ThemeHelper::Resume();
 
@@ -246,4 +246,63 @@ LRESULT CMainFrame::OnRunAsAdmin(WORD, WORD, HWND, BOOL&) {
 	}
 
 	return 0;
+}
+
+void CMainFrame::SetAlwaysOnTop() {
+	UISetCheck(ID_OPTIONS_ALWAYSONTOP, s_Settings.AlwaysOnTop());
+	SetWindowPos(s_Settings.AlwaysOnTop() ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+}
+
+LRESULT CMainFrame::OnAlwaysOnTop(WORD, WORD, HWND, BOOL&) {
+	s_Settings.AlwaysOnTop(!s_Settings.AlwaysOnTop());
+	SetAlwaysOnTop();
+	return 0;
+}
+
+void CMainFrame::UpdateRecentFilesMenu() {
+	if (s_recentFiles.IsEmpty())
+		return;
+
+	auto menu = ((CMenuHandle)GetMenu()).GetSubMenu(0);
+	CString text;
+	int i = 0;
+	for (; ; i++) {
+		menu.GetMenuString(i, text, MF_BYPOSITION);
+		if (text == L"&Recent Files")
+			break;
+	}
+	menu = menu.GetSubMenu(i);
+	while (menu.DeleteMenu(0, MF_BYPOSITION))
+		;
+
+	i = 0;
+	for (auto& file : s_recentFiles.Files()) {
+		menu.AppendMenu(MF_BYPOSITION, ATL_IDS_MRU_FILE + i++, file.c_str());
+	}
+}
+
+LRESULT CMainFrame::OnRecentFile(WORD, WORD id, HWND, BOOL&) {
+	DoFileOpen(s_recentFiles.Files()[id - ATL_IDS_MRU_FILE].c_str());
+	return 0;
+}
+
+bool CMainFrame::DoFileOpen(PCWSTR path, PCWSTR name) {
+	CString title(name);
+	if (title.IsEmpty()) {
+		title = wcsrchr(path, L'\\') + 1;
+	}
+	auto pView = new CMainView(this);
+	pView->Create(m_view, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+	CWaitCursor wait;
+	if (pView->OpenFile(path)) {
+		m_view.AddPage(pView->m_hWnd, title, 0, pView);
+		s_recentFiles.AddFile(path);
+		s_Settings.RecentFiles(s_recentFiles.Files());
+		UpdateRecentFilesMenu();
+		return true;
+	}
+	else {
+		pView->DestroyWindow();
+		return false;
+	}
 }

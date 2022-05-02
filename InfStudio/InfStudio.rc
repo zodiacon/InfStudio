@@ -60,6 +60,11 @@ BEGIN
         MENUITEM "&Save\tCtrl+S",               ID_FILE_SAVE
         MENUITEM "Save &As...",                 ID_FILE_SAVE_AS
         MENUITEM SEPARATOR
+        POPUP "&Recent Files"
+        BEGIN
+            MENUITEM "(Empty)",                     ID_RECENTFILES_
+        END
+        MENUITEM SEPARATOR
         MENUITEM "E&xit",                       ID_APP_EXIT
     END
     POPUP "&Edit"
@@ -76,6 +81,10 @@ BEGIN
     POPUP "&View"
     BEGIN
         MENUITEM "&Status Bar",                 ID_VIEW_STATUS_BAR
+    END
+    POPUP "&INF"
+    BEGIN
+        MENUITEM "&Validate",                   ID_INF_VALIDATE
     END
     POPUP "&Options"
     BEGIN

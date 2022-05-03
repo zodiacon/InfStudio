@@ -128,6 +128,7 @@ void CMainView::AnalyzeAndBuild(HTREEITEM hRoot) {
 						for (auto& directive : directives) {
 							AddKnownDirective(hModel, section.c_str(), directive.Name, directive.Icon, directive.Type);
 							AddKnownDirective(hModel, (section + L".NT").c_str(), directive.Name, directive.Icon, directive.Type);
+							AddKnownDirective(hModel, (section + L".Hw").c_str(), directive.Name, directive.Icon, directive.Type);
 							AddKnownDirective(hModel, (section + L"Ntamd64").c_str(), directive.Name, directive.Icon, directive.Type);
 							AddKnownDirective(hModel, (section + L".Hw.NT").c_str(), directive.Name, directive.Icon, directive.Type);
 						}
@@ -183,34 +184,32 @@ LRESULT CMainView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 
 int CMainView::AddKnownDirective(HTREEITEM hParent, PCWSTR section, PCWSTR directive, TreeIconIndex icon, NodeType type) {
 	int count = 0;
-	std::unordered_set<std::wstring> names;
 	HTREEITEM hSection = FindChild(m_Tree, hParent, section);
 
 	for (auto const& [key, value] : m_Inf.GetSectionCompactLines(section)) {
-		if (_wcsicmp(key.c_str(), directive) == 0) {
-			size_t pos = 0;
-			while (true) {
-				std::wstring name;
-				auto comma = value.find(L',', pos);
-				if (comma == std::wstring::npos) {
-					name = value.substr(pos);
-				}
-				else {
-					name = value.substr(pos, comma - pos);
-					pos = comma + 1;
-				}
-				ATLASSERT(!name.empty());
-				if (hSection == nullptr) {
-					hSection = InsertTreeItem(m_Tree, section, TreeIconIndex::Section, NodeType::Section, hParent, TVI_SORT);
-				}
-				if (!names.contains(name)) {
-					InsertTreeItem(m_Tree, name.c_str(), icon, type, hSection, TVI_SORT);
-					names.insert(std::move(name));
-					count++;
-				}
-				if (comma == std::wstring::npos)
-					break;
+		if (_wcsicmp(key.c_str(), directive) != 0)
+			continue;
+		size_t pos = 0;
+		while (true) {
+			std::wstring name;
+			auto comma = value.find(L',', pos);
+			if (comma == std::wstring::npos) {
+				name = value.substr(pos);
 			}
+			else {
+				name = value.substr(pos, comma - pos);
+				pos = comma + 1;
+			}
+			ATLASSERT(!name.empty());
+			if (hSection == nullptr) {
+				hSection = InsertTreeItem(m_Tree, section, TreeIconIndex::Section, NodeType::Section, hParent, TVI_SORT);
+			}
+			if (!FindChild(m_Tree, hSection, name.c_str())) {
+				InsertTreeItem(m_Tree, name.c_str(), icon, type, hSection, TVI_SORT);
+				count++;
+			}
+			if (comma == std::wstring::npos)
+				break;
 		}
 	}
 	return count;

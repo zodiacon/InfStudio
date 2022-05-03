@@ -1,6 +1,14 @@
 #include "pch.h"
 #include "MainView.h"
 #include "resource.h"
+#include <ThemeHelper.h>
+
+BOOL CMainView::PreTranslateMessage(MSG* pMsg) {
+	if (m_fr && m_fr->IsDialogMessage(pMsg))
+		return TRUE;
+
+	return FALSE;
+}
 
 bool CMainView::OpenFile(PCWSTR path) {
 	auto hFile = ::CreateFile(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -13,10 +21,14 @@ bool CMainView::OpenFile(PCWSTR path) {
 	WORD bom;
 	bool ok = false;
 	if (::ReadFile(hFile, &bom, sizeof(bom), &bytes, nullptr)) {
-		if (bom == 0xfeff)	// Unicode marker
+		if (bom == 0xfeff) {
+			// Unicode marker
 			size -= sizeof(bom);
-		else
+			m_Unicode = true;
+		}
+		else {
 			::SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
+		}
 		bytes = 0;
 		if (::ReadFile(hFile, buffer.get(), size, &bytes, nullptr) && bytes) {
 			if (bom == 0xfeff) {
@@ -40,8 +52,7 @@ bool CMainView::OpenFile(PCWSTR path) {
 }
 
 bool CMainView::OnTreeDoubleClick(HWND, HTREEITEM hItem) {
-	auto data = m_Tree.GetItemData(hItem);
-	if (data >= (int)NodeType::Section) {
+	if (auto data = m_Tree.GetItemData(hItem); data >= (int)NodeType::Section) {
 		//
 		// find section
 		//
@@ -64,6 +75,13 @@ void CMainView::OnActivated(bool active) {
 		UpdateUI();
 }
 
+bool CMainView::CanClose() {
+	if (m_InfView.IsModified()) {
+		// TODO: check if file save is requested
+	}
+	return !m_InfView.IsModified();
+}
+
 void CMainView::UpdateUI() {
 	auto& ui = UI();
 	ui.UIEnable(ID_EDIT_COPY, !m_InfView.IsSelectionEmpty());
@@ -79,7 +97,27 @@ void CMainView::UpdateUI() {
 }
 
 bool CMainView::DoSave(PCWSTR path) {
-	return false;
+	auto hFile = ::CreateFile(path, GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, 0, nullptr);
+	if (hFile == INVALID_HANDLE_VALUE)
+		return false;
+
+	DWORD bytes;
+	BOOL ok;
+	if (m_Unicode) {
+		WORD bom = 0xfeff;
+		::WriteFile(hFile, &bom, sizeof(bom), &bytes, nullptr);
+		auto text = m_InfView.GetText(m_InfView.Length());
+		ok = ::WriteFile(hFile, (PCWSTR)CString(text.c_str()), (DWORD)text.length() * sizeof(WCHAR), &bytes, nullptr);
+	}
+	else {
+		auto text = m_InfView.GetText(m_InfView.Length());
+		ok = ::WriteFile(hFile, text.c_str(), (DWORD)text.length(), &bytes, nullptr);
+	}
+	::CloseHandle(hFile);
+	if (ok) {
+		m_InfView.SetSavePoint();
+	}
+	return ok;
 }
 
 void CMainView::BuildTree() {
@@ -115,7 +153,7 @@ void CMainView::AnalyzeAndBuild(HTREEITEM hRoot) {
 					auto comma = value.find(L',');
 					if (comma != std::wstring::npos) {
 						auto section = value.substr(0, comma);
-						static struct {
+						static const struct {
 							PCWSTR Name;
 							TreeIconIndex Icon;
 							NodeType Type;
@@ -151,7 +189,11 @@ LRESULT CMainView::OnSave(WORD, WORD, HWND, BOOL&) {
 	if (m_Path.IsEmpty())
 		return SendMessage(WM_COMMAND, ID_FILE_SAVE_AS);
 
-	DoSave(m_Path);
+	if (!m_InfView.IsModified())
+		return false;
+
+	if (!DoSave(m_Path))
+		DisplaySaveError();
 	return 0;
 }
 
@@ -180,6 +222,10 @@ LRESULT CMainView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 	m_Splitter.SetSplitterPosPct(20);
 
 	return 0;
+}
+
+void CMainView::DisplaySaveError() {
+	AtlMessageBox(m_hWnd, L"Failed to save file", IDS_TITLE, MB_ICONERROR);
 }
 
 int CMainView::AddKnownDirective(HTREEITEM hParent, PCWSTR section, PCWSTR directive, TreeIconIndex icon, NodeType type) {
@@ -239,3 +285,53 @@ LRESULT CMainView::OnTreeKeyDown(int, LPNMHDR hdr, BOOL&) {
 
 	return 0;
 }
+
+LRESULT CMainView::OnEditFind(WORD, WORD, HWND, BOOL&) {
+	if (!m_fr) {
+		m_fr = new CFindReplaceDialog;
+		m_fr->Create(TRUE, m_SearchText, nullptr, FR_DOWN, m_hWnd);
+	}
+	m_fr->ShowWindow(SW_SHOW);
+	m_fr->SetFocus();
+
+	return 0;
+}
+
+LRESULT CMainView::OnFind(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
+	if (m_fr->IsTerminating()) {
+		m_fr = nullptr;
+	}
+	else {
+		auto options = Scintilla::FindOption::None;
+		if (m_fr->MatchCase())
+			options |= Scintilla::FindOption::MatchCase;
+		if (m_fr->MatchWholeWord())
+			options |= Scintilla::FindOption::WholeWord;
+		auto pos = m_InfView.FindTextW(options, CStringA(m_fr->GetFindString()));
+		if (pos >= 0) {
+			m_InfView.GotoPos(pos);
+			m_InfView.SetFocus();
+		}
+		else {
+			::MessageBeep(-1);
+		}
+	}
+	return 0;
+}
+
+LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
+	CSimpleFileDialog dlg(FALSE, L"inf", L"", OFN_ENABLESIZING | OFN_EXPLORER | OFN_OVERWRITEPROMPT,
+		L"INF Files\0*.inf;*.inx\0", m_hWnd);
+	ThemeHelper::Suspend();
+	auto result = dlg.DoModal();
+	ThemeHelper::Resume();
+	if (result == IDOK) {
+		m_Path = dlg.m_szFileName;
+		m_Name = dlg.m_szFileTitle;
+		Frame()->UpdateTabTitle(m_hWnd, m_Name);
+		if (!DoSave(m_Path))
+			DisplaySaveError();
+	}
+	return 0;
+}
+

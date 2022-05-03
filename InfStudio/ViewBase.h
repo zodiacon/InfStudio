@@ -27,10 +27,19 @@ public:
 	}
 
 	BEGIN_MSG_MAP(CViewBase)
+		MESSAGE_HANDLER(WM_FORWARDMSG, OnForwardMessage)
 		CHAIN_MSG_MAP(BaseFrame)
 	END_MSG_MAP()
 
 private:
+
+	LRESULT OnForwardMessage(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
+		auto msg = reinterpret_cast<MSG*>(lParam);
+		if (static_cast<T*>(this)->PreTranslateMessage(msg))
+			return TRUE;
+		return FALSE;
+	}
+
 	// Handler prototypes (uncomment arguments if needed):
 	//	LRESULT MessageHandler(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)
 	//	LRESULT CommandHandler(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)

@@ -9,11 +9,6 @@
 
 extern LexerModule lmProps;
 
-BOOL CInfView::PreTranslateMessage(MSG* pMsg) {
-	pMsg;
-	return FALSE;
-}
-
 LRESULT CInfView::OnSetFocus(UINT, WPARAM, LPARAM, BOOL&) {
 	Focus();
 	return 0;
@@ -29,7 +24,7 @@ LRESULT CInfView::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, 
 	StyleSetFore(SCE_PROPS_SECTION, RGB(160, 0, 0));
 	StyleSetFore(SCE_PROPS_ASSIGNMENT, RGB(0, 0, 255));
 	StyleSetFore(SCE_PROPS_DEFVAL, RGB(255, 0, 255));
-	
+
 	return 0;
 }
 

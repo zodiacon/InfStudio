@@ -7,6 +7,7 @@ struct IMainFrame abstract {
 	virtual bool AddToolBar(HWND tb) = 0;
 	virtual void SetStatusText(int index, PCWSTR text) = 0;
 	virtual HICON GetInfIcon() const = 0;
+	virtual bool UpdateTabTitle(HWND tab, PCWSTR title) = 0;
 };
 
 struct IView {

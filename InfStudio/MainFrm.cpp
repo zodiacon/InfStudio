@@ -19,7 +19,10 @@ BOOL CMainFrame::PreTranslateMessage(MSG* pMsg) {
 	if (CFrameWindowImpl<CMainFrame>::PreTranslateMessage(pMsg))
 		return TRUE;
 
-	return m_view.PreTranslateMessage(pMsg);
+	if (m_view.PreTranslateMessage(pMsg))
+		return TRUE;
+
+	return FALSE;
 }
 
 BOOL CMainFrame::OnIdle() {
@@ -72,7 +75,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	WIN32_FIND_DATA fd;
 	CImageList images;
 	images.Create(16, 16, ILC_COLOR32, 1, 1);
-	if (INVALID_HANDLE_VALUE != ::FindFirstFile(path + CString(L"*.inf"), &fd)) {
+	if (auto hFind = ::FindFirstFile(path + CString(L"*.inf"), &fd); hFind != INVALID_HANDLE_VALUE) {
 		WORD icon = 0;
 		wcscat_s(path, fd.cFileName);
 		auto hIcon = ::ExtractAssociatedIcon(_Module.GetModuleInstance(), path, &icon);
@@ -80,6 +83,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 			images.AddIcon(hIcon);
 			m_InfIcon.Attach(hIcon);
 		}
+		::FindClose(hFind);
 	}
 	m_view.SetImageList(images);
 
@@ -92,6 +96,8 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	ATLASSERT(pLoop != NULL);
 	pLoop->AddMessageFilter(this);
 	pLoop->AddIdleHandler(this);
+
+	UpdateUI();
 
 	return 0;
 }
@@ -144,17 +150,19 @@ LRESULT CMainFrame::OnFileNew(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl
 	auto pView = new CInfView;
 	pView->Create(m_view, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
 	m_view.AddPage(pView->m_hWnd, L"(Untitled)", -1, pView);
+	UpdateUI();
 
 	return 0;
 }
 
 LRESULT CMainFrame::OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
-	CSimpleFileDialog dlg(TRUE, L"inf", nullptr, OFN_EXPLORER | OFN_ENABLESIZING, L"INF Files\0*.inf\0");
+	CSimpleFileDialog dlg(TRUE, L"inf", nullptr, OFN_EXPLORER | OFN_ENABLESIZING, L"INF Files\0*.inf;*.inx\0");
 	ThemeHelper::Suspend();
 	if (IDOK == dlg.DoModal()) {
 		DoFileOpen(dlg.m_szFileName, dlg.m_szFileTitle);
 	}
 	ThemeHelper::Resume();
+	UpdateUI();
 
 	return 0;
 }
@@ -181,10 +189,11 @@ LRESULT CMainFrame::OnWindowClose(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWn
 		if (view->CanClose()) {
 			m_view.RemovePage(nActivePage);
 		}
+		UpdateUI();
 	}
-	else
+	else {
 		::MessageBeep((UINT)-1);
-
+	}
 	return 0;
 }
 
@@ -305,4 +314,21 @@ bool CMainFrame::DoFileOpen(PCWSTR path, PCWSTR name) {
 		pView->DestroyWindow();
 		return false;
 	}
+}
+
+void CMainFrame::UpdateUI() {
+	auto count = m_view.GetPageCount();
+	UIEnable(ID_WINDOW_CLOSE, count > 0);
+	UIEnable(ID_WINDOW_CLOSE_ALL, count > 0);
+	UIEnable(ID_FILE_CLOSE, count > 0);
+}
+
+bool CMainFrame::UpdateTabTitle(HWND tab, PCWSTR title) {
+	auto count = m_view.GetPageCount();
+	for (int i = 0; i < count; i++)
+		if (m_view.GetPageHWND(i) == tab) {
+			m_view.SetPageTitle(i, title);
+			return true;
+		}
+	return false;
 }

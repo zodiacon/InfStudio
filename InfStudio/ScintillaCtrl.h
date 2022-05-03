@@ -129,7 +129,10 @@ public:
 	void ClearTabStops(Line line);
 	void AddTabStop(Line line, int x);
 	int GetNextTabStop(Line line, int x);
-	void SetCodePage(int codePage);
+	void SetCodePage(int codePage) {
+		Execute(SCI_SETCODEPAGE, codePage);
+	}
+
 	void Focus(bool focus = true) {
 		Execute(SCI_SETFOCUS, focus);
 	}
@@ -448,8 +451,16 @@ public:
 		Execute(SCI_SETTEXT, 0, reinterpret_cast<LPARAM>(text));
 	}
 
-	Position GetText(Position length, char* text) const;
-	std::string GetText(Position length) const;
+	Position GetText(Position length, char* text) const {
+		return (Position)Execute(SCI_GETTEXT, length, reinterpret_cast<LPARAM>(text));
+	}
+
+	std::string GetText(Position length) const {
+		std::string text;
+		text.resize((size_t)length);
+		GetText(length, text.data());
+		return text;
+	}
 	Position TextLength() const;
 };
 

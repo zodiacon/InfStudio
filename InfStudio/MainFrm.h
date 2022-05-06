@@ -38,6 +38,7 @@ public:
 		COMMAND_ID_HANDLER(ID_WINDOW_CLOSE_ALL, OnWindowCloseAll)
 		COMMAND_ID_HANDLER(ID_FILE_RUNASADMINISTRATOR, OnRunAsAdmin)
 		COMMAND_RANGE_HANDLER(ATL_IDS_MRU_FILE, ATL_IDS_MRU_FILE + 29, OnRecentFile)
+		MESSAGE_HANDLER(WM_DROPFILES, OnDropFiles)
 		COMMAND_RANGE_HANDLER(ID_WINDOW_TABFIRST, ID_WINDOW_TABLAST, OnWindowActivate)
 		if (uMsg == WM_COMMAND && m_view.GetPageCount() > 0) {
 			int page = m_view.GetActivePage();
@@ -85,6 +86,7 @@ private:
 	LRESULT OnPageActivated(int, LPNMHDR hdr, BOOL&);
 	LRESULT OnRunAsAdmin(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnRecentFile(WORD, WORD id, HWND, BOOL&);
+	LRESULT OnDropFiles(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 
 	CCustomTabView m_view;
 	CIcon m_InfIcon;

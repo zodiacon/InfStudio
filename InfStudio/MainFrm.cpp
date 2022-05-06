@@ -31,6 +31,7 @@ BOOL CMainFrame::OnIdle() {
 }
 
 LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
+	DragAcceptFiles();
 	auto loaded = s_Settings.LoadFromKey(L"SOFTWARE\\ScorpioSoftware\\InfStudio");
 	if (loaded) {
 		s_recentFiles.Set(s_Settings.RecentFiles());
@@ -332,3 +333,13 @@ bool CMainFrame::UpdateTabTitle(HWND tab, PCWSTR title) {
 		}
 	return false;
 }
+
+LRESULT CMainFrame::OnDropFiles(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
+	auto hDrop = (HDROP)wParam;
+	WCHAR path[MAX_PATH];
+	if (::DragQueryFile(hDrop, 0, path, _countof(path)))
+		DoFileOpen(path);
+	::DragFinish(hDrop);
+	return 0;
+}
+

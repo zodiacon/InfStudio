@@ -5,7 +5,6 @@
 #include "pch.h"
 #include "resource.h"
 #include "AboutDlg.h"
-#include "InfView.h"
 #include "MainView.h"
 #include "MainFrm.h"
 #include "ToolbarHelper.h"
@@ -148,9 +147,9 @@ LRESULT CMainFrame::OnFileExit(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCt
 }
 
 LRESULT CMainFrame::OnFileNew(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
-	auto pView = new CInfView;
+	auto pView = new CMainView(this);
 	pView->Create(m_view, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
-	m_view.AddPage(pView->m_hWnd, L"(Untitled)", -1, pView);
+	m_view.AddPage(pView->m_hWnd, L"(Untitled)", 0, pView);
 	UpdateUI();
 
 	return 0;

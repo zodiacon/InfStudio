@@ -27,6 +27,7 @@ public:
 		MESSAGE_HANDLER(WM_SETFOCUS, OnSetFocus)
 		COMMAND_ID_HANDLER(ID_FILE_SAVE, OnSave)
 		COMMAND_ID_HANDLER(ID_FILE_SAVE_AS, OnSaveAs)
+		COMMAND_ID_HANDLER(ID_VIEW_REFRESH, OnRefresh)
 		MESSAGE_HANDLER(WM_CREATE, OnCreate)
 		CHAIN_MSG_MAP_MEMBER(m_InfView)
 		CHAIN_MSG_MAP(CTreeViewHelper<CMainView>)
@@ -43,7 +44,6 @@ private:
 		Invalid,
 		Root,
 		Sections,
-		Models,
 		Error,
 
 		Section = 0x100,
@@ -55,6 +55,7 @@ private:
 		DelFiles,
 		DestinationDirs,
 		Strings,
+		Models,
 	};
 
 	enum class TreeIconIndex {
@@ -87,6 +88,7 @@ private:
 	LRESULT OnTreeKeyDown(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	LRESULT OnEditFind(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnFind(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	LRESULT OnRefresh(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 
 	CTreeViewCtrl m_Tree;
 	CSplitterWindow m_Splitter;

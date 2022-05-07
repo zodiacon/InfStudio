@@ -48,6 +48,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 		{ ID_EDIT_CUT, IDI_CUT },
 		{ ID_EDIT_PASTE, IDI_PASTE },
 		{ 0 },
+		{ ID_VIEW_REFRESH, IDI_REFRESH },
 	};
 	CMenuHandle hMenu = GetMenu();
 	if (SecurityHelper::IsRunningElevated()) {
@@ -116,6 +117,7 @@ void CMainFrame::InitMenu() {
 		{ ID_EDIT_REDO, IDI_REDO },
 		{ ID_FILE_SAVE, IDI_SAVE },
 		{ ID_FILE_SAVE_AS, IDI_SAVE_AS },
+		{ ID_VIEW_REFRESH, IDI_REFRESH },
 		{ ID_OPTIONS_ALWAYSONTOP, IDI_PIN },
 		{ ID_FILE_RUNASADMINISTRATOR, 0, IconHelper::GetShieldIcon() },
 	};
@@ -292,6 +294,7 @@ void CMainFrame::UpdateRecentFilesMenu() {
 
 LRESULT CMainFrame::OnRecentFile(WORD, WORD id, HWND, BOOL&) {
 	DoFileOpen(s_recentFiles.Files()[id - ATL_IDS_MRU_FILE].c_str());
+	UpdateUI();
 	return 0;
 }
 
@@ -318,9 +321,19 @@ bool CMainFrame::DoFileOpen(PCWSTR path, PCWSTR name) {
 
 void CMainFrame::UpdateUI() {
 	auto count = m_view.GetPageCount();
-	UIEnable(ID_WINDOW_CLOSE, count > 0);
-	UIEnable(ID_WINDOW_CLOSE_ALL, count > 0);
-	UIEnable(ID_FILE_CLOSE, count > 0);
+	if (count == 0) {
+		UINT ids[] = {
+			ID_WINDOW_CLOSE, ID_WINDOW_CLOSE_ALL, ID_FILE_CLOSE, ID_FILE_SAVE, ID_FILE_SAVE_AS, ID_EDIT_COPY,
+			ID_EDIT_PASTE, ID_EDIT_CUT, ID_EDIT_UNDO, ID_EDIT_REDO, ID_VIEW_REFRESH
+		};
+		for (auto id : ids)
+			UIEnable(id, false);
+	}
+	else if (count == 1) {
+		UIEnable(ID_WINDOW_CLOSE, true);
+		UIEnable(ID_WINDOW_CLOSE_ALL, true);
+		UIEnable(ID_FILE_CLOSE, true);
+	}
 }
 
 bool CMainFrame::UpdateTabTitle(HWND tab, PCWSTR title) {

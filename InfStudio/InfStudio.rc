@@ -81,6 +81,8 @@ BEGIN
     END
     POPUP "&View"
     BEGIN
+        MENUITEM "&Refresh\tF5",                ID_VIEW_REFRESH
+        MENUITEM SEPARATOR
         MENUITEM "&Status Bar",                 ID_VIEW_STATUS_BAR
     END
     POPUP "&INF"
@@ -152,6 +154,8 @@ IDI_DEVICE              ICON                    "res\\device.ico"
 
 IDI_DEVICES             ICON                    "res\\devices.ico"
 
+IDI_REFRESH             ICON                    "D:\\Dev\\InfStudio\\InfStudio\\res\\refresh.ico"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -200,6 +204,7 @@ BEGIN
     VK_INSERT,      ID_EDIT_COPY,           VIRTKEY, CONTROL, NOINVERT
     VK_DELETE,      ID_EDIT_CUT,            VIRTKEY, SHIFT, NOINVERT
     "X",            ID_EDIT_CUT,            VIRTKEY, CONTROL, NOINVERT
+    "F",            ID_EDIT_FIND,           VIRTKEY, CONTROL, NOINVERT
     "V",            ID_EDIT_PASTE,          VIRTKEY, CONTROL, NOINVERT
     VK_INSERT,      ID_EDIT_PASTE,          VIRTKEY, SHIFT, NOINVERT
     VK_BACK,        ID_EDIT_UNDO,           VIRTKEY, ALT, NOINVERT
@@ -210,7 +215,7 @@ BEGIN
     "S",            ID_FILE_SAVE,           VIRTKEY, CONTROL, NOINVERT
     VK_F6,          ID_NEXT_PANE,           VIRTKEY, NOINVERT
     VK_F6,          ID_PREV_PANE,           VIRTKEY, SHIFT, NOINVERT
-    "F",            ID_EDIT_FIND,           VIRTKEY, CONTROL, NOINVERT
+    VK_F5,          ID_VIEW_REFRESH,        VIRTKEY, NOINVERT
 END
 
 
@@ -220,8 +225,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,1,0,0
- PRODUCTVERSION 0,1,0,0
+ FILEVERSION 0,2,0,0
+ PRODUCTVERSION 0,2,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -238,12 +243,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Scorpio Software"
             VALUE "FileDescription", "INF Studio - View/Edit INF Files"
-            VALUE "FileVersion", "0.1.0.0"
+            VALUE "FileVersion", "0.2.0.0"
             VALUE "InternalName", "InfStudio"
             VALUE "LegalCopyright", "©2022 Pavel Yosifovich"
             VALUE "OriginalFilename", "InfStudio.exe"
             VALUE "ProductName", "INF Studio"
-            VALUE "ProductVersion", "0.1.0.0"
+            VALUE "ProductVersion", "0.2.0.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -271,21 +276,17 @@ END
 
 STRINGTABLE
 BEGIN
-    IDR_MAINFRAME           "INF Studio"
+    IDR_MAINFRAME           "INF Studio v0.2"
     IDS_TITLE               "INF Studio"
 END
 
 STRINGTABLE
 BEGIN
-    ID_FILE_NEW             "Create a new document\nNew"
-    ID_FILE_OPEN            "Open an existing document\nOpen"
+    ID_FILE_NEW             "Create a new INF file\nNew"
+    ID_FILE_OPEN            "Open an existing file\nOpen"
     ID_FILE_CLOSE           "Close the active document\nClose"
     ID_FILE_SAVE            "Save the active document\nSave"
     ID_FILE_SAVE_AS         "Save the active document with a new name\nSave As"
-    ID_FILE_PAGE_SETUP      "Change the printing options\nPage Setup"
-    ID_FILE_PRINT_SETUP     "Change the printer and printing options\nPrint Setup"
-    ID_FILE_PRINT           "Print the active document\nPrint"
-    ID_FILE_PRINT_PREVIEW   "Display full pages\nPrint Preview"
 END
 
 STRINGTABLE
@@ -332,9 +333,6 @@ END
 
 STRINGTABLE
 BEGIN
-    ATL_IDS_SCSIZE          "Change the window size"
-    ATL_IDS_SCMOVE          "Change the window position"
-    ATL_IDS_SCMINIMIZE      "Reduce the window to an icon"
     ATL_IDS_SCMAXIMIZE      "Enlarge the window to full size"
     ATL_IDS_SCNEXTWINDOW    "Switch to the next document window"
     ATL_IDS_SCPREVWINDOW    "Switch to the previous document window"
@@ -344,8 +342,6 @@ END
 STRINGTABLE
 BEGIN
     ATL_IDS_SCRESTORE       "Restore the window to normal size"
-    ATL_IDS_SCTASKLIST      "Activate Task List"
-    ATL_IDS_MDICHILD        "Activate this window"
 END
 
 STRINGTABLE
@@ -355,7 +351,7 @@ END
 
 STRINGTABLE
 BEGIN
-    ATL_IDS_MRU_FILE        "Open this document"
+    ATL_IDS_MRU_FILE        "Open this file"
 END
 
 #endif    // English (United States) resources

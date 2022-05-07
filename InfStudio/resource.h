@@ -25,6 +25,7 @@
 #define IDI_VERSION                     219
 #define IDI_DEVICE                      220
 #define IDI_DEVICES                     221
+#define IDI_REFRESH                     222
 #define ID_WINDOW_CLOSE                 32772
 #define ID_WINDOW_CLOSE_ALL             32773
 #define ID_FILE_RUNASADMINISTRATOR      32775
@@ -37,13 +38,14 @@
 #define ID_FILE_RECENTFILES             32782
 #define ID_RECENTFILES_                 32783
 #define ID_FILE_CLOSE32786              32786
+#define ID_VIEW_REFRESH32787            32787
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        222
-#define _APS_NEXT_COMMAND_VALUE         32787
+#define _APS_NEXT_RESOURCE_VALUE        224
+#define _APS_NEXT_COMMAND_VALUE         32790
 #define _APS_NEXT_CONTROL_VALUE         1000
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

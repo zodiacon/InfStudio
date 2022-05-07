@@ -71,15 +71,22 @@ bool CMainView::OnTreeDoubleClick(HWND, HTREEITEM hItem) {
 }
 
 void CMainView::OnActivated(bool active) {
-	if (active)
+	if (active) {
 		UpdateUI();
+		UI().UIEnable(ID_VIEW_REFRESH, true);
+		UI().UIEnable(ID_EDIT_FIND, true);
+	}
 }
 
 bool CMainView::CanClose() {
 	if (m_InfView.IsModified()) {
-		// TODO: check if file save is requested
+		int result = AtlMessageBox(m_hWnd, L"Save file before close?", IDS_TITLE, MB_YESNOCANCEL | MB_DEFBUTTON1 | MB_ICONQUESTION);
+		if (result == IDCANCEL)
+			return false;
+		if (result == IDYES)
+			SendMessage(WM_COMMAND, ID_FILE_SAVE);
 	}
-	return !m_InfView.IsModified();
+	return true;
 }
 
 void CMainView::UpdateUI() {
@@ -145,11 +152,11 @@ void CMainView::AnalyzeAndBuild(HTREEITEM hRoot) {
 	}
 	auto mfg = m_Inf.GetSectionCompactLines(L"Manufacturer");
 	if (!mfg.empty()) {
-		auto hMfg = InsertTreeItem(m_Tree, L"Models", TreeIconIndex::Models, NodeType::Models, hRoot);
+		auto hMfg = InsertTreeItem(m_Tree, L"Manufacturer", TreeIconIndex::Models, NodeType::Models, hRoot);
 		for (auto& [key, value] : mfg) {
-			for (auto& model : InfFile::GetStringPairs(value)) {
+			for (auto const& model : InfFile::GetStringPairs(value)) {
 				auto hModel = InsertTreeItem(m_Tree, model.c_str(), TreeIconIndex::Model, NodeType::Model, hMfg);
-				for (auto& [key, value] : m_Inf.GetSectionCompactLines(model.c_str())) {
+				for (auto const& [key, value] : m_Inf.GetSectionCompactLines(model.c_str())) {
 					auto comma = value.find(L',');
 					if (comma != std::wstring::npos) {
 						auto section = value.substr(0, comma);
@@ -335,3 +342,9 @@ LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/
 	return 0;
 }
 
+LRESULT CMainView::OnRefresh(WORD, WORD, HWND, BOOL&) {
+	SendMessage(WM_COMMAND, ID_FILE_SAVE);
+	CWaitCursor wait;
+	BuildTree();
+	return 0;
+}

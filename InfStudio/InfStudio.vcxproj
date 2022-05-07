@@ -257,6 +257,7 @@
     <Image Include="res\paste.ico" />
     <Image Include="res\pin.ico" />
     <Image Include="res\redo.ico" />
+    <Image Include="res\refresh.ico" />
     <Image Include="res\registry_delete.ico" />
     <Image Include="res\registry_edit.ico" />
     <Image Include="res\save.ico" />

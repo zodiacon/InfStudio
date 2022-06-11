@@ -3,6 +3,7 @@
 #include "ViewBase.h"
 #include <TreeViewHelper.h>
 #include "InfView.h"
+#include <CustomSplitterWindow.h>
 #include "..\InfCore\InfFile.h"
 
 class CMainView : 
@@ -91,7 +92,7 @@ private:
 	LRESULT OnRefresh(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 
 	CTreeViewCtrl m_Tree;
-	CSplitterWindow m_Splitter;
+	CCustomSplitterWindow m_Splitter;
 	CInfView m_InfView;
 	InfFile m_Inf;
 	CString m_Path;

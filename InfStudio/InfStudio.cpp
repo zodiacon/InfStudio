@@ -39,8 +39,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lps
 	ATLASSERT(SUCCEEDED(hRes));
 
 	ThemeHelper::Init();
-	static Theme defTheme;
-	ThemeHelper::SetCurrentTheme(defTheme);
 
 	Scintilla_RegisterClasses(_Module.GetModuleInstance());
 

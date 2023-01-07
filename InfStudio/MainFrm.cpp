@@ -66,7 +66,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	UIAddToolBar(tb);
 
 	m_view.m_bTabCloseButton = FALSE;
-	m_hWndClient = m_view.Create(m_hWnd, rcDefault, NULL, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+	m_hWndClient = m_view.Create(m_hWnd, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
 	UISetCheck(ID_VIEW_STATUS_BAR, 1);
 	m_view.SetWindowMenu(hMenu.GetSubMenu(WINDOW_MENU_POSITION));
 

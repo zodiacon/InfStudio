@@ -5,9 +5,10 @@
 #include "pch.h"
 #include "resource.h"
 #include "InfView.h"
-#include "LexProps.cxx"
+#include "LexerModule.h"
+#include "SciLexer.h"
 
-extern LexerModule lmProps;
+extern Lexilla::LexerModule lmProps;
 
 LRESULT CInfView::OnSetFocus(UINT, WPARAM, LPARAM, BOOL&) {
 	Focus();

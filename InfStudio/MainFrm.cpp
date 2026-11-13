@@ -7,6 +7,7 @@
 #include "AboutDlg.h"
 #include "MainView.h"
 #include "DriversView.h"
+#include "TemplateDlg.h"
 #include "MainFrm.h"
 #include <ToolbarHelper.h>
 #include "SecurityHelper.h"
@@ -234,11 +235,17 @@ void CMainFrame::AddTemplatesMenu(CMenuHandle fileMenu) {
 }
 
 LRESULT CMainFrame::OnNewFromTemplate(WORD, WORD wID, HWND, BOOL&) {
-	auto const& infTemplate = InfTemplates::All()[wID - ID_TEMPLATE_FIRST];
+	// the wizard, on the template chosen (it may choose another)
+	CTemplateDlg dlg(wID - ID_TEMPLATE_FIRST);
+	if (dlg.DoModal(m_hWnd) != IDOK)
+		return 0;
+	auto const& infTemplate = dlg.Template();
+	auto const& values = dlg.Values();
 	auto pView = new CMainView(this);
 	pView->Create(m_view, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
-	pView->NewFromText(InfTemplates::Generate(infTemplate, InfTemplates::NewValues()), infTemplate.FileName);
-	m_view.AddPage(pView->m_hWnd, CString(infTemplate.FileName) + L" (new)", 0, static_cast<IView*>(pView));
+	auto fileName = InfTemplates::FileName(infTemplate, values);
+	pView->NewFromText(InfTemplates::Generate(infTemplate, values), fileName.c_str());
+	m_view.AddPage(pView->m_hWnd, CString(fileName.c_str()) + L" (new)", 0, static_cast<IView*>(pView));
 	UpdateUI();
 	return 0;
 }

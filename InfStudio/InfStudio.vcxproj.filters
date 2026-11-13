@@ -33,6 +33,9 @@
     <ClCompile Include="AboutDlg.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TemplateDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="SecurityHelper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -87,6 +90,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AboutDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TemplateDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ScintillaCtrl.h">

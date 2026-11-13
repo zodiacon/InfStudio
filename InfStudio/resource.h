@@ -3,6 +3,17 @@
 // Used by InfStudio.rc
 //
 #define IDD_ABOUTBOX                    100
+#define IDD_TEMPLATE                    224
+#define IDC_TEMPLATE                    1000
+#define IDC_DRIVERNAME                  1001
+#define IDC_MANUFACTURER                1002
+#define IDC_DESCRIPTION                 1003
+#define IDC_HARDWAREID                  1004
+#define IDC_HARDWAREID_LABEL            1005
+#define IDC_VERSION                     1006
+#define IDC_PROBLEM                     1007
+#define IDC_PREVIEW                     1008
+#define IDC_PREVIEW_LABEL               1009
 #define IDR_MAINFRAME                   128
 #define IDS_TITLE                       129
 #define IDI_COPY                        201
@@ -61,9 +72,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        224
+#define _APS_NEXT_RESOURCE_VALUE        225
 #define _APS_NEXT_COMMAND_VALUE         32807
-#define _APS_NEXT_CONTROL_VALUE         1000
+#define _APS_NEXT_CONTROL_VALUE         1010
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

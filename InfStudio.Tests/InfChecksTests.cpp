@@ -108,7 +108,15 @@ TEST_CASE("Nothing to report", "[checks]") {
 TEST_CASE("The templates have no problems", "[checks][templates]") {
 	auto index = GENERATE(range(size_t(0), InfTemplates::All().size()));
 	auto const& t = InfTemplates::All()[index];
-	auto text = InfTemplates::Generate(t, InfTemplates::NewValues());
+	auto values = InfTemplates::NewValues();
+	// and with the values a user might give
+	if (GENERATE(false, true)) {
+		values.DriverName = L"AcmeWidget2";
+		values.Manufacturer = L"Acme \"Labs\" 100%";
+		values.HardwareId = t.HardwareId ? L"USB\\VID_ABCD&PID_0042" : L"";
+		values.Version = L"3.1.0.0";
+	}
+	auto text = InfTemplates::Generate(t, values);
 	auto found = Check(text);
 	for (auto const& f : found)
 		UNSCOPED_INFO(f.Text << ": " << f.Message);

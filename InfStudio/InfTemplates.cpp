@@ -2,6 +2,7 @@
 #include "InfTemplates.h"
 
 #include <format>
+#include <algorithm>
 
 //
 // Every template must pass "infverif /w" (Windows Driver requirements) once generated; InfStudio.Tests checks it when the
@@ -9,7 +10,7 @@
 //
 namespace {
 	constexpr char PciKmdf[] = R"(;
-; MyPciDriver.inf - a KMDF driver for a PCI device
+; @NAME@.inf - a KMDF driver for a PCI device
 ;
 
 [Version]
@@ -17,8 +18,8 @@ Signature   = "$Windows NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyPciDriver.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [DestinationDirs]
@@ -28,23 +29,23 @@ DefaultDestDir = 13
 1 = %DiskName%
 
 [SourceDisksFiles]
-MyPciDriver.sys = 1
+@NAME@.sys = 1
 
 [Manufacturer]
 %ManufacturerName% = Standard,NTamd64.10.0...16299,NTarm64.10.0...16299
 
 ; the device's hardware ID: its vendor and device IDs (and perhaps SUBSYS_ and REV_)
 [Standard.NTamd64.10.0...16299]
-%DeviceDesc% = MyDevice_Install, PCI\VEN_1234&DEV_5678
+%DeviceDesc% = MyDevice_Install, @HWID@
 
 [Standard.NTarm64.10.0...16299]
-%DeviceDesc% = MyDevice_Install, PCI\VEN_1234&DEV_5678
+%DeviceDesc% = MyDevice_Install, @HWID@
 
 [MyDevice_Install.NT]
 CopyFiles = MyDevice_CopyFiles
 
 [MyDevice_CopyFiles]
-MyPciDriver.sys
+@NAME@.sys
 
 [MyDevice_Install.NT.HW]
 AddReg = MyDevice_HW_AddReg
@@ -56,31 +57,31 @@ HKR, "Interrupt Management\MessageSignaledInterruptProperties",, 0x00000010
 HKR, "Interrupt Management\MessageSignaledInterruptProperties", MSISupported, 0x00010001, 1
 
 [MyDevice_Install.NT.Services]
-AddService = MyPciDriver, %SPSVCINST_ASSOCSERVICE%, MyDevice_Service_Install
+AddService = @NAME@, %SPSVCINST_ASSOCSERVICE%, MyDevice_Service_Install
 
 [MyDevice_Service_Install]
 DisplayName   = %ServiceName%
 ServiceType   = 1               ; SERVICE_KERNEL_DRIVER
 StartType     = 3               ; SERVICE_DEMAND_START
 ErrorControl  = 1               ; SERVICE_ERROR_NORMAL
-ServiceBinary = %13%\MyPciDriver.sys
+ServiceBinary = %13%\@NAME@.sys
 
 [MyDevice_Install.NT.Wdf]
-KmdfService = MyPciDriver, MyDevice_Wdf
+KmdfService = @NAME@, MyDevice_Wdf
 
 [MyDevice_Wdf]
 KmdfLibraryVersion = 1.15
 
 [Strings]
 SPSVCINST_ASSOCSERVICE = 0x00000002
-ManufacturerName       = "Contoso"
-DiskName               = "MyPciDriver Installation Disk"
-DeviceDesc             = "Contoso PCI Device"
-ServiceName            = "MyPciDriver Service"
+ManufacturerName       = "@MFG@"
+DiskName               = "@NAME@ Installation Disk"
+DeviceDesc             = "@DESC@"
+ServiceName            = "@NAME@ Service"
 )";
 
 	constexpr char UsbWinUsb[] = R"(;
-; MyUsbDevice.inf - a USB device that uses WinUSB (no driver of its own; an application talks to it with WinUsb_* functions)
+; @NAME@.inf - a USB device that uses WinUSB (no driver of its own; an application talks to it with WinUsb_* functions)
 ;
 
 [Version]
@@ -88,8 +89,8 @@ Signature   = "$Windows NT$"
 Class       = USBDevice
 ClassGuid   = {88bae032-5a81-49f0-bc3d-a4ff138216d6}
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyUsbDevice.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [Manufacturer]
@@ -97,10 +98,10 @@ PnpLockdown = 1
 
 ; the device's hardware ID: its vendor and product IDs (and perhaps &MI_xx for an interface of a composite device)
 [Standard.NTamd64.10.0...16299]
-%DeviceName% = MyDevice_Install, USB\VID_1234&PID_5678
+%DeviceName% = MyDevice_Install, @HWID@
 
 [Standard.NTarm64.10.0...16299]
-%DeviceName% = MyDevice_Install, USB\VID_1234&PID_5678
+%DeviceName% = MyDevice_Install, @HWID@
 
 [MyDevice_Install.NT]
 Include = winusb.inf
@@ -118,12 +119,12 @@ AddReg = MyDevice_HW_AddReg
 HKR,, DeviceInterfaceGUIDs, 0x00010000, "@GUID@"
 
 [Strings]
-ManufacturerName = "Contoso"
-DeviceName       = "Contoso USB Device"
+ManufacturerName = "@MFG@"
+DeviceName       = "@DESC@"
 )";
 
 	constexpr char UsbKmdf[] = R"(;
-; MyUsbDriver.inf - a KMDF driver for a USB device
+; @NAME@.inf - a KMDF driver for a USB device
 ;
 
 [Version]
@@ -131,8 +132,8 @@ Signature   = "$Windows NT$"
 Class       = USBDevice
 ClassGuid   = {88bae032-5a81-49f0-bc3d-a4ff138216d6}
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyUsbDriver.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [DestinationDirs]
@@ -142,54 +143,54 @@ DefaultDestDir = 13
 1 = %DiskName%
 
 [SourceDisksFiles]
-MyUsbDriver.sys = 1
+@NAME@.sys = 1
 
 [Manufacturer]
 %ManufacturerName% = Standard,NTamd64.10.0...16299,NTarm64.10.0...16299
 
 ; the device's hardware ID: its vendor and product IDs (and perhaps &MI_xx for an interface of a composite device)
 [Standard.NTamd64.10.0...16299]
-%DeviceDesc% = MyDevice_Install, USB\VID_1234&PID_5678
+%DeviceDesc% = MyDevice_Install, @HWID@
 
 [Standard.NTarm64.10.0...16299]
-%DeviceDesc% = MyDevice_Install, USB\VID_1234&PID_5678
+%DeviceDesc% = MyDevice_Install, @HWID@
 
 [MyDevice_Install.NT]
 CopyFiles = MyDevice_CopyFiles
 
 [MyDevice_CopyFiles]
-MyUsbDriver.sys
+@NAME@.sys
 
 [MyDevice_Install.NT.Services]
-AddService = MyUsbDriver, %SPSVCINST_ASSOCSERVICE%, MyDevice_Service_Install
+AddService = @NAME@, %SPSVCINST_ASSOCSERVICE%, MyDevice_Service_Install
 
 [MyDevice_Service_Install]
 DisplayName   = %ServiceName%
 ServiceType   = 1               ; SERVICE_KERNEL_DRIVER
 StartType     = 3               ; SERVICE_DEMAND_START
 ErrorControl  = 1               ; SERVICE_ERROR_NORMAL
-ServiceBinary = %13%\MyUsbDriver.sys
+ServiceBinary = %13%\@NAME@.sys
 
 [MyDevice_Install.NT.Wdf]
-KmdfService = MyUsbDriver, MyDevice_Wdf
+KmdfService = @NAME@, MyDevice_Wdf
 
 [MyDevice_Wdf]
 KmdfLibraryVersion = 1.15
 
 [Strings]
 SPSVCINST_ASSOCSERVICE = 0x00000002
-ManufacturerName       = "Contoso"
-DiskName               = "MyUsbDriver Installation Disk"
-DeviceDesc             = "Contoso USB Device"
-ServiceName            = "MyUsbDriver Service"
+ManufacturerName       = "@MFG@"
+DiskName               = "@NAME@ Installation Disk"
+DeviceDesc             = "@DESC@"
+ServiceName            = "@NAME@ Service"
 )";
 
 	constexpr char RootKmdf[] = R"(;
-; MyVirtualDriver.inf - a KMDF driver for a software (root-enumerated) device, which has no hardware
+; @NAME@.inf - a KMDF driver for a software (root-enumerated) device, which has no hardware
 ;
 ; Create the device and install the driver with:
-;   devgen /add /hardwareid "Root\MyVirtualDevice"
-;   pnputil /add-driver MyVirtualDriver.inf /install
+;   devgen /add /hardwareid "@HWID@"
+;   pnputil /add-driver @NAME@.inf /install
 ;
 
 [Version]
@@ -197,8 +198,8 @@ Signature   = "$Windows NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyVirtualDriver.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [DestinationDirs]
@@ -208,49 +209,49 @@ DefaultDestDir = 13
 1 = %DiskName%
 
 [SourceDisksFiles]
-MyVirtualDriver.sys = 1
+@NAME@.sys = 1
 
 [Manufacturer]
 %ManufacturerName% = Standard,NTamd64.10.0...16299,NTarm64.10.0...16299
 
 [Standard.NTamd64.10.0...16299]
-%DeviceDesc% = MyDevice_Install, Root\MyVirtualDevice
+%DeviceDesc% = MyDevice_Install, @HWID@
 
 [Standard.NTarm64.10.0...16299]
-%DeviceDesc% = MyDevice_Install, Root\MyVirtualDevice
+%DeviceDesc% = MyDevice_Install, @HWID@
 
 [MyDevice_Install.NT]
 CopyFiles = MyDevice_CopyFiles
 
 [MyDevice_CopyFiles]
-MyVirtualDriver.sys
+@NAME@.sys
 
 [MyDevice_Install.NT.Services]
-AddService = MyVirtualDriver, %SPSVCINST_ASSOCSERVICE%, MyDevice_Service_Install
+AddService = @NAME@, %SPSVCINST_ASSOCSERVICE%, MyDevice_Service_Install
 
 [MyDevice_Service_Install]
 DisplayName   = %ServiceName%
 ServiceType   = 1               ; SERVICE_KERNEL_DRIVER
 StartType     = 3               ; SERVICE_DEMAND_START
 ErrorControl  = 1               ; SERVICE_ERROR_NORMAL
-ServiceBinary = %13%\MyVirtualDriver.sys
+ServiceBinary = %13%\@NAME@.sys
 
 [MyDevice_Install.NT.Wdf]
-KmdfService = MyVirtualDriver, MyDevice_Wdf
+KmdfService = @NAME@, MyDevice_Wdf
 
 [MyDevice_Wdf]
 KmdfLibraryVersion = 1.15
 
 [Strings]
 SPSVCINST_ASSOCSERVICE = 0x00000002
-ManufacturerName       = "Contoso"
-DiskName               = "MyVirtualDriver Installation Disk"
-DeviceDesc             = "Contoso Virtual Device"
-ServiceName            = "MyVirtualDriver Service"
+ManufacturerName       = "@MFG@"
+DiskName               = "@NAME@ Installation Disk"
+DeviceDesc             = "@DESC@"
+ServiceName            = "@NAME@ Service"
 )";
 
 	constexpr char Umdf[] = R"(;
-; MyUmdfDriver.inf - a UMDF 2 (user mode) driver (running from the driver store needs Windows 10 1803: 10.0.17134)
+; @NAME@.inf - a UMDF 2 (user mode) driver (running from the driver store needs Windows 10 1803: 10.0.17134)
 ;
 
 [Version]
@@ -258,8 +259,8 @@ Signature   = "$Windows NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyUmdfDriver.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [DestinationDirs]
@@ -269,23 +270,23 @@ DefaultDestDir = 13
 1 = %DiskName%
 
 [SourceDisksFiles]
-MyUmdfDriver.dll = 1
+@NAME@.dll = 1
 
 [Manufacturer]
 %ManufacturerName% = Standard,NTamd64.10.0...17134,NTarm64.10.0...17134
 
 ; the device's hardware ID (Root\... for a software device)
 [Standard.NTamd64.10.0...17134]
-%DeviceDesc% = MyDevice_Install, Root\MyUmdfDevice
+%DeviceDesc% = MyDevice_Install, @HWID@
 
 [Standard.NTarm64.10.0...17134]
-%DeviceDesc% = MyDevice_Install, Root\MyUmdfDevice
+%DeviceDesc% = MyDevice_Install, @HWID@
 
 [MyDevice_Install.NT]
 CopyFiles = MyDevice_CopyFiles
 
 [MyDevice_CopyFiles]
-MyUmdfDriver.dll
+@NAME@.dll
 
 ; the reflector (WUDFRd), which passes the device's requests to the driver in its host process, from Windows' own INF
 [MyDevice_Install.NT.HW]
@@ -297,21 +298,21 @@ Include = wudfrd.inf
 Needs   = WUDFRD.NT.Services
 
 [MyDevice_Install.NT.Wdf]
-UmdfService      = MyUmdfDriver, MyUmdfDriver_Install
-UmdfServiceOrder = MyUmdfDriver
+UmdfService      = @NAME@, @NAME@_Install
+UmdfServiceOrder = @NAME@
 
-[MyUmdfDriver_Install]
+[@NAME@_Install]
 UmdfLibraryVersion = 2.15.0
-ServiceBinary      = %13%\MyUmdfDriver.dll
+ServiceBinary      = %13%\@NAME@.dll
 
 [Strings]
-ManufacturerName  = "Contoso"
-DiskName          = "MyUmdfDriver Installation Disk"
-DeviceDesc        = "Contoso UMDF Device"
+ManufacturerName  = "@MFG@"
+DiskName          = "@NAME@ Installation Disk"
+DeviceDesc        = "@DESC@"
 )";
 
 	constexpr char Extension[] = R"(;
-; MyExtension.inf - an extension INF: settings added to a device that another INF installs
+; @NAME@.inf - an extension INF: settings added to a device that another INF installs
 ;
 
 [Version]
@@ -320,8 +321,8 @@ Class       = Extension
 ClassGuid   = {e2f84ce7-8efa-411c-aa69-97454ca4cb57}
 ExtensionId = @GUID@        ; the same in every version of this extension
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyExtension.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [Manufacturer]
@@ -329,30 +330,30 @@ PnpLockdown = 1
 
 ; the hardware ID of the device to extend
 [Standard.NTamd64.10.0...16299]
-%DeviceDesc% = MyExtension_Install, PCI\VEN_1234&DEV_5678
+%DeviceDesc% = @NAME@_Install, @HWID@
 
 [Standard.NTarm64.10.0...16299]
-%DeviceDesc% = MyExtension_Install, PCI\VEN_1234&DEV_5678
+%DeviceDesc% = @NAME@_Install, @HWID@
 
-[MyExtension_Install.NT]
+[@NAME@_Install.NT]
 
-[MyExtension_Install.NT.HW]
-AddReg = MyExtension_HW_AddReg
+[@NAME@_Install.NT.HW]
+AddReg = @NAME@_HW_AddReg
 
-[MyExtension_HW_AddReg]
+[@NAME@_HW_AddReg]
 ; under the device's hardware key
 HKR,, MySetting, 0x00010001, 1
 
 [Strings]
-ManufacturerName = "Contoso"
-DeviceDesc       = "Contoso Device Extension"
+ManufacturerName = "@MFG@"
+DeviceDesc       = "@DESC@"
 )";
 
 	constexpr char Minifilter[] = R"(;
-; MyFilter.inf - a file system minifilter driver
+; @NAME@.inf - a file system minifilter driver
 ;
-; Install with right-click > Install, or: pnputil /add-driver MyFilter.inf /install
-; Then: fltmc load MyFilter
+; Install with right-click > Install, or: pnputil /add-driver @NAME@.inf /install
+; Then: fltmc load @NAME@
 ;
 
 [Version]
@@ -360,68 +361,68 @@ Signature   = "$Windows NT$"
 Class       = ActivityMonitor   ; the class of the altitude range (see "File System Filter Driver Classes")
 ClassGuid   = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyFilter.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [DestinationDirs]
-MyFilter_DriverFiles = 13
+@NAME@_DriverFiles = 13
 
 [SourceDisksNames]
 1 = %DiskName%
 
 [SourceDisksFiles]
-MyFilter.sys = 1
+@NAME@.sys = 1
 
 [DefaultInstall.NTamd64]
 OptionDesc = %ServiceDescription%
-CopyFiles  = MyFilter_DriverFiles
+CopyFiles  = @NAME@_DriverFiles
 
 [DefaultInstall.NTamd64.Services]
-AddService = %ServiceName%,, MyFilter_Service
+AddService = %ServiceName%,, @NAME@_Service
 
 [DefaultInstall.NTarm64]
 OptionDesc = %ServiceDescription%
-CopyFiles  = MyFilter_DriverFiles
+CopyFiles  = @NAME@_DriverFiles
 
 [DefaultInstall.NTarm64.Services]
-AddService = %ServiceName%,, MyFilter_Service
+AddService = %ServiceName%,, @NAME@_Service
 
-[MyFilter_DriverFiles]
-MyFilter.sys
+[@NAME@_DriverFiles]
+@NAME@.sys
 
-[MyFilter_Service]
+[@NAME@_Service]
 DisplayName    = %ServiceName%
 Description    = %ServiceDescription%
-ServiceBinary  = %13%\MyFilter.sys
+ServiceBinary  = %13%\@NAME@.sys
 Dependencies   = "FltMgr"
 ServiceType    = 2              ; SERVICE_FILE_SYSTEM_DRIVER
 StartType      = 3              ; SERVICE_DEMAND_START
 ErrorControl   = 1              ; SERVICE_ERROR_NORMAL
 LoadOrderGroup = "FSFilter Activity Monitor"
-AddReg         = MyFilter_AddReg
+AddReg         = @NAME@_AddReg
 
-[MyFilter_AddReg]
+[@NAME@_AddReg]
 HKR, "Parameters", "SupportedFeatures", 0x00010001, 0x3
 HKR, "Parameters\Instances", "DefaultInstance", 0x00000000, %DefaultInstance%
 HKR, "Parameters\Instances\"%Instance1.Name%, "Altitude", 0x00000000, %Instance1.Altitude%
 HKR, "Parameters\Instances\"%Instance1.Name%, "Flags", 0x00010001, %Instance1.Flags%
 
 [Strings]
-ManufacturerName   = "Contoso"
-DiskName           = "MyFilter Installation Disk"
-ServiceName        = "MyFilter"
-ServiceDescription = "MyFilter File System Minifilter"
-DefaultInstance    = "MyFilter Instance"
-Instance1.Name     = "MyFilter Instance"
+ManufacturerName   = "@MFG@"
+DiskName           = "@NAME@ Installation Disk"
+ServiceName        = "@NAME@"
+ServiceDescription = "@DESC@"
+DefaultInstance    = "@NAME@ Instance"
+Instance1.Name     = "@NAME@ Instance"
 Instance1.Altitude = "370030"   ; in the Activity Monitor range: request an altitude of your own from Microsoft
 Instance1.Flags    = 0x0        ; attach to new volumes automatically
 )";
 
 	constexpr char NdisLwf[] = R"(;
-; MyLwf.inf - an NDIS lightweight filter driver
+; @NAME@.inf - an NDIS lightweight filter driver
 ;
-; Install with: netcfg -l MyLwf.inf -c s -i MS_MyLwf
+; Install with: netcfg -l @NAME@.inf -c s -i MS_@NAME@
 ;
 
 [Version]
@@ -429,8 +430,8 @@ Signature   = "$Windows NT$"
 Class       = NetService
 ClassGuid   = {4d36e974-e325-11ce-bfc1-08002be10318}
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyLwf.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [DestinationDirs]
@@ -440,29 +441,29 @@ DefaultDestDir = 13
 1 = %DiskName%
 
 [SourceDisksFiles]
-MyLwf.sys = 1
+@NAME@.sys = 1
 
 [Manufacturer]
 %ManufacturerName% = Standard,NTamd64.10.0...16299,NTarm64.10.0...16299
 
 [Standard.NTamd64.10.0...16299]
-%FilterDesc% = MyLwf_Install, MS_MyLwf
+%FilterDesc% = @NAME@_Install, MS_@NAME@
 
 [Standard.NTarm64.10.0...16299]
-%FilterDesc% = MyLwf_Install, MS_MyLwf
+%FilterDesc% = @NAME@_Install, MS_@NAME@
 
-[MyLwf_Install]
-AddReg           = MyLwf_Ndi
+[@NAME@_Install]
+AddReg           = @NAME@_Ndi
 Characteristics  = 0x40000      ; NCF_LW_FILTER
 NetCfgInstanceId = "@GUID@"     ; unique to this filter: the same in every version of it
-CopyFiles        = MyLwf_CopyFiles
+CopyFiles        = @NAME@_CopyFiles
 
-[MyLwf_CopyFiles]
-MyLwf.sys
+[@NAME@_CopyFiles]
+@NAME@.sys
 
-[MyLwf_Ndi]
-HKR, Ndi,            Service,          , "MyLwf"
-HKR, Ndi,            CoServices,       0x00010000, "MyLwf"
+[@NAME@_Ndi]
+HKR, Ndi,            Service,          , "@NAME@"
+HKR, Ndi,            CoServices,       0x00010000, "@NAME@"
 HKR, Ndi,            HelpText,         , %FilterHelp%
 HKR, Ndi,            FilterClass,      , custom      ; where the filter goes in the stack (compression, encryption, scheduler...)
 HKR, Ndi,            FilterType,       0x00010001, 2 ; 1 monitoring, 2 modifying
@@ -471,38 +472,38 @@ HKR, Ndi\Interfaces, UpperRange,       , "noupper"
 HKR, Ndi\Interfaces, LowerRange,       , "nolower"
 HKR, Ndi\Interfaces, FilterMediaTypes, , "ethernet"
 
-[MyLwf_Install.Services]
-AddService = MyLwf,, MyLwf_Service_Install
+[@NAME@_Install.Services]
+AddService = @NAME@,, @NAME@_Service_Install
 
-[MyLwf_Service_Install]
+[@NAME@_Service_Install]
 DisplayName    = %ServiceName%
 Description    = %FilterDesc%
 ServiceType    = 1              ; SERVICE_KERNEL_DRIVER
 StartType      = 1              ; SERVICE_SYSTEM_START
 ErrorControl   = 1              ; SERVICE_ERROR_NORMAL
-ServiceBinary  = %13%\MyLwf.sys
+ServiceBinary  = %13%\@NAME@.sys
 LoadOrderGroup = NDIS
-AddReg         = MyLwf_Service_AddReg
+AddReg         = @NAME@_Service_AddReg
 
-[MyLwf_Service_AddReg]
+[@NAME@_Service_AddReg]
 HKR, Parameters, NdisImPlatformBindingOptions, 0x00010001, 0   ; default binding with NIC teaming (LBFO)
 
-[MyLwf_Install.Remove.Services]
-DelService = MyLwf, 0x200       ; SPSVCINST_STOPSERVICE
+[@NAME@_Install.Remove.Services]
+DelService = @NAME@, 0x200       ; SPSVCINST_STOPSERVICE
 
 [Strings]
-ManufacturerName = "Contoso"
-DiskName         = "MyLwf Installation Disk"
-FilterDesc       = "Contoso NDIS Lightweight Filter"
-FilterHelp       = "Contoso NDIS Lightweight Filter"
-ServiceName      = "MyLwf"
+ManufacturerName = "@MFG@"
+DiskName         = "@NAME@ Installation Disk"
+FilterDesc       = "@DESC@"
+FilterHelp       = "@DESC@"
+ServiceName      = "@NAME@"
 )";
 
 	constexpr char KernelService[] = R"(;
-; MyDriver.inf - a kernel driver that isn't for a device (a primitive driver: a service only)
+; @NAME@.inf - a kernel driver that isn't for a device (a primitive driver: a service only)
 ;
-; Install with right-click > Install, or: pnputil /add-driver MyDriver.inf /install
-; Then: sc start MyDriver
+; Install with right-click > Install, or: pnputil /add-driver @NAME@.inf /install
+; Then: sc start @NAME@
 ;
 
 [Version]
@@ -510,59 +511,59 @@ Signature   = "$Windows NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = %ManufacturerName%
-DriverVer   = @DATE@,1.0.0.0
-CatalogFile = MyDriver.cat
+DriverVer   = @DATE@,@VERSION@
+CatalogFile = @NAME@.cat
 PnpLockdown = 1
 
 [DestinationDirs]
-MyDriver_DriverFiles = 13
+@NAME@_DriverFiles = 13
 
 [SourceDisksNames]
 1 = %DiskName%
 
 [SourceDisksFiles]
-MyDriver.sys = 1
+@NAME@.sys = 1
 
 [DefaultInstall.NTamd64]
-CopyFiles = MyDriver_DriverFiles
+CopyFiles = @NAME@_DriverFiles
 
 [DefaultInstall.NTamd64.Services]
-AddService = MyDriver,, MyDriver_Service
+AddService = @NAME@,, @NAME@_Service
 
 [DefaultInstall.NTarm64]
-CopyFiles = MyDriver_DriverFiles
+CopyFiles = @NAME@_DriverFiles
 
 [DefaultInstall.NTarm64.Services]
-AddService = MyDriver,, MyDriver_Service
+AddService = @NAME@,, @NAME@_Service
 
-[MyDriver_DriverFiles]
-MyDriver.sys
+[@NAME@_DriverFiles]
+@NAME@.sys
 
-[MyDriver_Service]
+[@NAME@_Service]
 DisplayName   = %ServiceName%
 Description   = %ServiceDescription%
-ServiceBinary = %13%\MyDriver.sys
+ServiceBinary = %13%\@NAME@.sys
 ServiceType   = 1               ; SERVICE_KERNEL_DRIVER
 StartType     = 3               ; SERVICE_DEMAND_START
 ErrorControl  = 1               ; SERVICE_ERROR_NORMAL
 
 [Strings]
-ManufacturerName   = "Contoso"
-DiskName           = "MyDriver Installation Disk"
-ServiceName        = "MyDriver"
-ServiceDescription = "Contoso Kernel Driver"
+ManufacturerName   = "@MFG@"
+DiskName           = "@NAME@ Installation Disk"
+ServiceName        = "@NAME@"
+ServiceDescription = "@DESC@"
 )";
 
 	constexpr InfTemplate Templates[] = {
-		{ L"&PCI Device (KMDF)", L"MyPciDriver.inf", 0, PciKmdf },
-		{ L"&USB Device (WinUSB)", L"MyUsbDevice.inf", 0, UsbWinUsb },
-		{ L"USB Device (&KMDF)", L"MyUsbDriver.inf", 0, UsbKmdf },
-		{ L"&Software Device (KMDF, Root Enumerated)", L"MyVirtualDriver.inf", 0, RootKmdf },
-		{ L"User Mode Driver (UM&DF 2)", L"MyUmdfDriver.inf", 0, Umdf },
-		{ L"&Extension INF", L"MyExtension.inf", 0, Extension },
-		{ L"&File System Minifilter", L"MyFilter.inf", 1, Minifilter },
-		{ L"&NDIS Lightweight Filter", L"MyLwf.inf", 1, NdisLwf },
-		{ L"Kernel Service (&Primitive Driver)", L"MyDriver.inf", 2, KernelService },
+		{ L"&PCI Device (KMDF)", 0, PciKmdf, L"MyPciDriver", L"Contoso PCI Device", LR"(PCI\VEN_1234&DEV_5678)" },
+		{ L"&USB Device (WinUSB)", 0, UsbWinUsb, L"MyUsbDevice", L"Contoso USB Device", LR"(USB\VID_1234&PID_5678)" },
+		{ L"USB Device (&KMDF)", 0, UsbKmdf, L"MyUsbDriver", L"Contoso USB Device", LR"(USB\VID_1234&PID_5678)" },
+		{ L"&Software Device (KMDF, Root Enumerated)", 0, RootKmdf, L"MyVirtualDriver", L"Contoso Virtual Device", LR"(Root\MyVirtualDevice)" },
+		{ L"User Mode Driver (UM&DF 2)", 0, Umdf, L"MyUmdfDriver", L"Contoso UMDF Device", LR"(Root\MyUmdfDevice)" },
+		{ L"&Extension INF", 0, Extension, L"MyExtension", L"Contoso Device Extension", LR"(PCI\VEN_1234&DEV_5678)" },
+		{ L"&File System Minifilter", 1, Minifilter, L"MyFilter", L"MyFilter File System Minifilter", nullptr },
+		{ L"&NDIS Lightweight Filter", 1, NdisLwf, L"MyLwf", L"Contoso NDIS Lightweight Filter", nullptr },
+		{ L"Kernel Service (&Primitive Driver)", 2, KernelService, L"MyDriver", L"Contoso Kernel Driver", nullptr },
 	};
 
 	void ReplaceAll(std::string& text, std::string_view what, std::string_view with) {
@@ -582,16 +583,106 @@ InfTemplates::Values InfTemplates::NewValues() {
 	return values;
 }
 
+InfTemplates::Values InfTemplates::DefaultValues(InfTemplate const& infTemplate) {
+	auto values = NewValues();
+	values.DriverName = infTemplate.DriverName;
+	values.Manufacturer = DefaultManufacturer;
+	values.Description = infTemplate.Description;
+	values.HardwareId = infTemplate.HardwareId ? infTemplate.HardwareId : L"";
+	values.Version = DefaultVersion;
+	return values;
+}
+
 std::string InfTemplates::GuidText(GUID const& guid) {
 	return std::format("{{{:08X}-{:04X}-{:04X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
 		guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1],
 		guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
 }
 
+namespace {
+	std::string Utf8(std::wstring_view text) {
+		if (text.empty())
+			return {};
+		auto size = ::WideCharToMultiByte(CP_UTF8, 0, text.data(), (int)text.size(), nullptr, 0, nullptr, nullptr);
+		std::string utf8(size, '\0');
+		::WideCharToMultiByte(CP_UTF8, 0, text.data(), (int)text.size(), utf8.data(), size, nullptr, nullptr);
+		return utf8;
+	}
+
+	// the value, or the default if it's empty
+	std::wstring_view Or(std::wstring const& value, PCWSTR defaultValue) {
+		return value.empty() ? std::wstring_view(defaultValue ? defaultValue : L"") : std::wstring_view(value);
+	}
+
+	// for inside a quoted string in [Strings]: "" is a quote (a % is as it is there: SetupAPI doesn't turn %% into one)
+	std::string Quoted(std::wstring_view text) {
+		auto utf8 = Utf8(text);
+		ReplaceAll(utf8, "\"", "\"\"");
+		return utf8;
+	}
+}
+
 std::string InfTemplates::Generate(InfTemplate const& infTemplate, Values const& values) {
 	std::string text = infTemplate.Text;
 	ReplaceAll(text, "@DATE@", std::format("{:02}/{:02}/{:04}", values.Date.wMonth, values.Date.wDay, values.Date.wYear));
 	ReplaceAll(text, "@GUID@", GuidText(values.Guid));
+	ReplaceAll(text, "@NAME@", Utf8(Or(values.DriverName, infTemplate.DriverName)));
+	ReplaceAll(text, "@MFG@", Quoted(Or(values.Manufacturer, DefaultManufacturer)));
+	ReplaceAll(text, "@DESC@", Quoted(Or(values.Description, infTemplate.Description)));
+	ReplaceAll(text, "@HWID@", Utf8(Or(values.HardwareId, infTemplate.HardwareId)));
+	ReplaceAll(text, "@VERSION@", Utf8(Or(values.Version, DefaultVersion)));
 	ReplaceAll(text, "\n", "\r\n");
 	return text;
+}
+
+std::wstring InfTemplates::FileName(InfTemplate const& infTemplate, Values const& values) {
+	return std::wstring(Or(values.DriverName, infTemplate.DriverName)) + L".inf";
+}
+
+std::optional<InfTemplates::Problem> InfTemplates::Check(InfTemplate const& infTemplate, Values const& values) {
+	auto letter = [](wchar_t ch) { return (ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z') || ch == L'_'; };
+	auto digit = [](wchar_t ch) { return ch >= L'0' && ch <= L'9'; };
+
+	// the name of sections, a service, files and the catalog
+	auto const& name = values.DriverName;
+	if (name.empty())
+		return Problem{ Field::DriverName, L"The driver needs a name." };
+	if (!letter(name[0]) || !std::all_of(name.begin(), name.end(), [&](wchar_t ch) { return letter(ch) || digit(ch); }))
+		return Problem{ Field::DriverName, L"The driver's name is the name of its service and files: letters, digits and _, not starting with a digit." };
+	if (name.size() > 64)
+		return Problem{ Field::DriverName, L"The driver's name is too long (64 characters at most)." };
+
+	auto text = [](std::wstring const& value) {
+		return std::all_of(value.begin(), value.end(), [](wchar_t ch) { return ch >= L' '; });
+	};
+	if (values.Manufacturer.empty() || !text(values.Manufacturer))
+		return Problem{ Field::Manufacturer, L"The manufacturer (the provider too) needs a name, on one line." };
+	if (values.Description.empty() || !text(values.Description))
+		return Problem{ Field::Description, L"The description can't be empty, and is one line." };
+
+	if (infTemplate.HardwareId) {
+		auto const& id = values.HardwareId;
+		if (id.empty())
+			return Problem{ Field::HardwareId, L"The device's hardware ID is needed (e.g. PCI\\VEN_1234&DEV_5678)." };
+		if (!std::all_of(id.begin(), id.end(), [](wchar_t ch) { return ch > L' ' && ch < 0x7f && !wcschr(L",;\"%=[]", ch); }))
+			return Problem{ Field::HardwareId, L"A hardware ID has no blanks, and none of , ; \" % = [ ]." };
+		if (id.size() > 200)
+			return Problem{ Field::HardwareId, L"A hardware ID is 200 characters at most." };
+	}
+
+	// 4 numbers, up to 65535 (InfVerif wants all 4)
+	auto const& version = values.Version;
+	int parts = 0;
+	bool good = !version.empty();
+	for (size_t pos = 0; good && pos <= version.size(); parts++) {
+		auto end = version.find(L'.', pos);
+		if (end == std::wstring::npos)
+			end = version.size();
+		auto part = std::wstring_view(version).substr(pos, end - pos);
+		good = !part.empty() && part.size() <= 5 && std::all_of(part.begin(), part.end(), digit) && std::stoul(std::wstring(part)) <= 65535;
+		pos = end + 1;
+	}
+	if (!good || parts != 4)
+		return Problem{ Field::Version, L"The version is 4 numbers (0 to 65535) with dots between them, e.g. 1.0.0.0." };
+	return {};
 }

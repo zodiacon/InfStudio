@@ -320,6 +320,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AboutDlg.cpp" />
+    <ClCompile Include="TemplateDlg.cpp" />
     <ClCompile Include="AppSettings.cpp" />
     <ClCompile Include="InfStudio.cpp" />
     <ClCompile Include="MainFrm.cpp" />
@@ -348,6 +349,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AboutDlg.h" />
+    <ClInclude Include="TemplateDlg.h" />
     <ClInclude Include="AppSettings.h" />
     <ClInclude Include="Interfaces.h" />
     <ClInclude Include="MainFrm.h" />

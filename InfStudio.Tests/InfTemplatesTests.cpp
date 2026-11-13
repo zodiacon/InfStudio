@@ -82,7 +82,7 @@ TEST_CASE("The templates", "[templates]") {
 	std::set<std::wstring> names, files;
 	for (auto const& t : all) {
 		names.insert(t.Name);
-		files.insert(t.FileName);
+		files.insert(InfTemplates::FileName(t, {}));
 	}
 	CHECK(names.size() == all.size());
 	CHECK(files.size() == all.size());
@@ -93,7 +93,7 @@ TEST_CASE("The templates", "[templates]") {
 TEST_CASE("Every template makes a good INF", "[templates]") {
 	auto index = GENERATE(range(size_t(0), InfTemplates::All().size()));
 	auto const& t = InfTemplates::All()[index];
-	CAPTURE(TextFile::ToUtf8(t.FileName));
+	CAPTURE(TextFile::ToUtf8(t.Name));
 
 	auto values = TestValues();
 	auto text = InfTemplates::Generate(t, values);
@@ -110,13 +110,13 @@ TEST_CASE("Every template makes a good INF", "[templates]") {
 		CHECK(text.find(InfTemplates::GuidText(values.Guid)) != std::string::npos);
 
 	// SetupAPI takes it, and every string key it uses is in [Strings]
-	TempFile file(t.FileName);
+	TempFile file(InfTemplates::FileName(t, values));
 	file.Write(text);
 	InfFile inf;
 	UINT errorLine = 0;
 	REQUIRE(inf.Open(file.c_str(), nullptr, &errorLine));
 	CHECK(inf.GetStringValue(L"Version", L"Signature", 1) == L"$Windows NT$");
-	CHECK(inf.GetStringValue(L"Version", L"CatalogFile", 1) == std::filesystem::path(t.FileName).replace_extension(L".cat").wstring());
+	CHECK(inf.GetStringValue(L"Version", L"CatalogFile", 1) == std::wstring(t.DriverName) + L".cat");
 
 	std::set<std::wstring> defined;
 	for (auto const& [key, value] : inf.GetSectionCompactLines(L"Strings"))
@@ -143,7 +143,7 @@ TEST_CASE("Every template passes InfVerif", "[templates][infverif]") {
 
 	auto index = GENERATE(range(size_t(0), InfTemplates::All().size()));
 	auto const& t = InfTemplates::All()[index];
-	TempFile file(t.FileName);
+	TempFile file(InfTemplates::FileName(t, {}));
 	file.Write(InfTemplates::Generate(t, InfTemplates::NewValues()));
 
 	// /w: Windows Driver requirements
@@ -152,4 +152,135 @@ TEST_CASE("Every template passes InfVerif", "[templates][infverif]") {
 	REQUIRE(result.Ran);
 	CHECK(result.Messages.empty());
 	CHECK(result.ExitCode == 0);
+}
+
+namespace {
+	// what a user might type in the wizard: a quote and a percent in the quoted strings
+	InfTemplates::Values CustomValues(InfTemplate const& t) {
+		auto values = TestValues();
+		values.DriverName = L"AcmeWidget2";
+		values.Manufacturer = L"Acme \"Labs\" 100%";
+		values.Description = L"Acme Widget, 2nd edition";
+		values.HardwareId = t.HardwareId ? L"PCI\\VEN_ABCD&DEV_0042&SUBSYS_00000000" : L"";
+		values.Version = L"2.5.0.0";
+		return values;
+	}
+}
+
+TEST_CASE("The defaults are what the templates are without values", "[templates]") {
+	auto index = GENERATE(range(size_t(0), InfTemplates::All().size()));
+	auto const& t = InfTemplates::All()[index];
+	auto defaults = InfTemplates::DefaultValues(t);
+	CHECK_FALSE(InfTemplates::Check(t, defaults));
+	CHECK(defaults.Manufacturer == L"Contoso");
+	CHECK(defaults.Version == L"1.0.0.0");
+	CHECK(defaults.HardwareId.empty() == (t.HardwareId == nullptr));
+
+	auto empty = TestValues();
+	auto filled = defaults;
+	filled.Date = empty.Date;
+	filled.Guid = empty.Guid;
+	CHECK(InfTemplates::Generate(t, filled) == InfTemplates::Generate(t, empty));
+	CHECK(InfTemplates::FileName(t, defaults) == std::wstring(t.DriverName) + L".inf");
+}
+
+TEST_CASE("A template with the wizard's values", "[templates]") {
+	auto index = GENERATE(range(size_t(0), InfTemplates::All().size()));
+	auto const& t = InfTemplates::All()[index];
+	CAPTURE(TextFile::ToUtf8(t.Name));
+	auto values = CustomValues(t);
+	REQUIRE_FALSE(InfTemplates::Check(t, values));
+	auto text = InfTemplates::Generate(t, values);
+
+	// none of the defaults left
+	CHECK(text.find('@') == std::string::npos);
+	CHECK(text.find("Contoso") == std::string::npos);
+	CHECK(text.find(TextFile::ToUtf8(t.DriverName)) == std::string::npos);
+	if (t.HardwareId)
+		CHECK(text.find(TextFile::ToUtf8(t.HardwareId)) == std::string::npos);
+	CHECK(text.find("DriverVer   = 03/07/2026,2.5.0.0\r\n") != std::string::npos);
+
+	TempFile file(InfTemplates::FileName(t, values));
+	CHECK(file.Path().filename().wstring().ends_with(L"-AcmeWidget2.inf"));
+	file.Write(text);
+	InfFile inf;
+	UINT errorLine = 0;
+	REQUIRE(inf.Open(file.c_str(), nullptr, &errorLine));
+	CHECK(inf.GetStringValue(L"Version", L"CatalogFile", 1) == L"AcmeWidget2.cat");
+	// the quote escaped (the percent isn't, in [Strings]): SetupAPI gives them back as typed
+	CHECK(inf.GetStringValue(L"Strings", L"ManufacturerName", 1) == values.Manufacturer);
+	CHECK(inf.GetStringValue(L"Version", L"Provider", 1) == values.Manufacturer);
+	// the hardware ID a models section installs on
+	if (t.HardwareId) {
+		bool found = false;
+		for (auto const& [key, value] : inf.GetSectionCompactLines(L"Manufacturer"))
+			for (auto const& section : InfFile::GetModelSections(value))
+				for (auto const& [desc, install] : inf.GetSectionCompactLines(section.c_str()))
+					found |= install.find(values.HardwareId) != std::wstring::npos;
+		CHECK(found);
+	}
+}
+
+TEST_CASE("Templates with the wizard's values pass InfVerif", "[templates][infverif]") {
+	auto infverif = InfVerif::Find();
+	if (infverif.empty())
+		SKIP("the WDK's infverif.exe isn't installed");
+
+	auto index = GENERATE(range(size_t(0), InfTemplates::All().size()));
+	auto const& t = InfTemplates::All()[index];
+	auto values = CustomValues(t);
+	TempFile file(InfTemplates::FileName(t, values));
+	file.Write(InfTemplates::Generate(t, values));
+	auto result = InfVerif::Run(infverif, L"/w", file.Path());
+	CAPTURE(result.Output);
+	REQUIRE(result.Ran);
+	CHECK(result.Messages.empty());
+	CHECK(result.ExitCode == 0);
+}
+
+TEST_CASE("The wizard's values are checked", "[templates]") {
+	auto const& device = InfTemplates::All()[0];
+	REQUIRE(device.HardwareId);
+	auto good = InfTemplates::DefaultValues(device);
+	auto problem = [&](auto change) {
+		auto values = good;
+		change(values);
+		auto found = InfTemplates::Check(device, values);
+		return found ? std::optional(found->Field) : std::nullopt;
+	};
+	using F = InfTemplates::Field;
+	CHECK(problem([](auto& v) { v.DriverName = L""; }) == F::DriverName);
+	CHECK(problem([](auto& v) { v.DriverName = L"2Fast"; }) == F::DriverName);
+	CHECK(problem([](auto& v) { v.DriverName = L"My Driver"; }) == F::DriverName);
+	CHECK(problem([](auto& v) { v.DriverName = L"My-Driver"; }) == F::DriverName);
+	CHECK(problem([](auto& v) { v.DriverName = std::wstring(65, L'a'); }) == F::DriverName);
+	CHECK(problem([](auto& v) { v.DriverName = L"_my_driver64"; }) == std::nullopt);
+
+	CHECK(problem([](auto& v) { v.Manufacturer = L""; }) == F::Manufacturer);
+	CHECK(problem([](auto& v) { v.Manufacturer = L"Two\r\nlines"; }) == F::Manufacturer);
+	CHECK(problem([](auto& v) { v.Description = L""; }) == F::Description);
+	CHECK(problem([](auto& v) { v.Description = L"Caf\u00e9 \"quoted\" 50%"; }) == std::nullopt);
+
+	CHECK(problem([](auto& v) { v.HardwareId = L""; }) == F::HardwareId);
+	CHECK(problem([](auto& v) { v.HardwareId = L"PCI\\VEN_1234 DEV_5678"; }) == F::HardwareId);
+	CHECK(problem([](auto& v) { v.HardwareId = L"PCI\\VEN_1234,DEV_5678"; }) == F::HardwareId);
+	CHECK(problem([](auto& v) { v.HardwareId = L"PCI\\VEN_%1234%"; }) == F::HardwareId);
+	CHECK(problem([](auto& v) { v.HardwareId = L"ACPI\\PNP0C0A"; }) == std::nullopt);
+
+	CHECK(problem([](auto& v) { v.Version = L""; }) == F::Version);
+	CHECK(problem([](auto& v) { v.Version = L"1.0.0.0.0"; }) == F::Version);
+	CHECK(problem([](auto& v) { v.Version = L"1..0"; }) == F::Version);
+	CHECK(problem([](auto& v) { v.Version = L"1.0."; }) == F::Version);
+	CHECK(problem([](auto& v) { v.Version = L"1.65536"; }) == F::Version);
+	CHECK(problem([](auto& v) { v.Version = L"v1"; }) == F::Version);
+	CHECK(problem([](auto& v) { v.Version = L"10"; }) == F::Version);
+	CHECK(problem([](auto& v) { v.Version = L"1.2.3"; }) == F::Version);
+	CHECK(problem([](auto& v) { v.Version = L"65535.0.12.4"; }) == std::nullopt);
+
+	// a template without a hardware ID doesn't need one
+	auto service = std::find_if(InfTemplates::All().begin(), InfTemplates::All().end(), [](auto const& t) { return !t.HardwareId; });
+	REQUIRE(service != InfTemplates::All().end());
+	auto values = InfTemplates::DefaultValues(*service);
+	CHECK(values.HardwareId.empty());
+	CHECK_FALSE(InfTemplates::Check(*service, values));
 }

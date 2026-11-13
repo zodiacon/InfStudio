@@ -36,6 +36,12 @@
     <ClCompile Include="SecurityHelper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TextFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="InfLexer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="MainView.cpp">
       <Filter>Views</Filter>
     </ClCompile>
@@ -66,6 +72,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SecurityHelper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TextFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InfLexer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">

@@ -5,6 +5,7 @@
 #include "InfView.h"
 #include <CustomSplitterWindow.h>
 #include "..\InfCore\InfFile.h"
+#include "TextFile.h"
 
 class CMainView : 
 	public CViewBase<CMainView>,
@@ -76,6 +77,8 @@ private:
 	void DisplaySaveError();
 	void UpdateUI();
 	bool DoSave(PCWSTR path);
+	// an ANSI file with characters the code page doesn't have: asks whether to save it as Unicode. False if cancelled
+	bool ConfirmEncoding();
 	void BuildTree();
 	void AnalyzeAndBuild(HTREEITEM hRoot);
 	int AddKnownDirective(HTREEITEM hParent, PCWSTR section, PCWSTR directive, TreeIconIndex icon, NodeType type);
@@ -101,6 +104,6 @@ private:
 	int m_TreeIconSize{ 16 };
 	CFindReplaceDialog* m_fr{ nullptr };
 	CString m_SearchText;
-	bool m_Unicode{ false };
+	TextEncoding m_Encoding{ TextEncoding::Ansi };
 };
 

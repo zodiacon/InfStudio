@@ -5,21 +5,22 @@
 #include "pch.h"
 #include "resource.h"
 #include "InfView.h"
+#include "InfLexer.h"
 
 namespace {
-	// the colors of the editor in one mode; the lexer is Lexilla's "props" (INI-like), which suits INF files
+	// the colors of the editor in one mode (the styles are InfLexer's)
 	struct EditorColors {
-		COLORREF Back, Text, Comment, Section, Assignment, DefVal, Key;
+		COLORREF Back, Text, Comment, Section, Key, Operator, String, Token, Number;
 		COLORREF Caret, Selection, CaretLine, MarginBack, MarginText;
 	};
 
 	constexpr EditorColors LightColors{
-		RGB(255, 255, 255), RGB(0, 0, 0), RGB(0, 128, 0), RGB(160, 0, 0), RGB(0, 0, 255), RGB(255, 0, 255), RGB(0, 0, 128),
+		RGB(255, 255, 255), RGB(0, 0, 0), RGB(0, 128, 0), RGB(160, 0, 0), RGB(0, 0, 160), RGB(90, 90, 90), RGB(0, 128, 128), RGB(128, 0, 128), RGB(152, 104, 1),
 		RGB(0, 0, 0), RGB(173, 214, 255), RGB(242, 246, 252), RGB(240, 240, 240), RGB(130, 130, 130),
 	};
 
 	constexpr EditorColors DarkColors{
-		RGB(30, 30, 30), RGB(212, 212, 212), RGB(106, 153, 85), RGB(86, 156, 214), RGB(180, 180, 180), RGB(206, 145, 120), RGB(156, 220, 254),
+		RGB(30, 30, 30), RGB(212, 212, 212), RGB(106, 153, 85), RGB(86, 156, 214), RGB(156, 220, 254), RGB(170, 170, 170), RGB(206, 145, 120), RGB(197, 134, 192), RGB(181, 206, 168),
 		RGB(220, 220, 220), RGB(38, 79, 120), RGB(42, 45, 46), RGB(37, 37, 38), RGB(133, 133, 133),
 	};
 }
@@ -31,7 +32,9 @@ LRESULT CInfView::OnSetFocus(UINT, WPARAM, LPARAM, BOOL&) {
 
 LRESULT CInfView::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
 	DefWindowProc();
-	SetLexer(static_cast<Scintilla::ILexer5*>(CreateLexer("props")));
+	// the document is UTF-8 (TextFile converts the file's encoding to and from it)
+	Execute(SCI_SETCODEPAGE, SC_CP_UTF8);
+	SetLexer(InfLexer::Create());
 	// line numbers in margin 0
 	Execute(SCI_SETMARGINTYPEN, 0, SC_MARGIN_NUMBER);
 	ApplyColors();
@@ -51,12 +54,14 @@ void CInfView::ApplyColors() {
 	Execute(SCI_STYLESETBACK, STYLE_DEFAULT, c.Back);
 	// every style takes the default's font and colors, the lexer's styles then get their own
 	Execute(SCI_STYLECLEARALL);
-	StyleSetFore(SCE_PROPS_COMMENT, c.Comment);
-	StyleSetFore(SCE_PROPS_SECTION, c.Section);
-	Execute(SCI_STYLESETBOLD, SCE_PROPS_SECTION, TRUE);
-	StyleSetFore(SCE_PROPS_ASSIGNMENT, c.Assignment);
-	StyleSetFore(SCE_PROPS_DEFVAL, c.DefVal);
-	StyleSetFore(SCE_PROPS_KEY, c.Key);
+	StyleSetFore(InfLexer::Comment, c.Comment);
+	StyleSetFore(InfLexer::Section, c.Section);
+	Execute(SCI_STYLESETBOLD, InfLexer::Section, TRUE);
+	StyleSetFore(InfLexer::Key, c.Key);
+	StyleSetFore(InfLexer::Operator, c.Operator);
+	StyleSetFore(InfLexer::String, c.String);
+	StyleSetFore(InfLexer::Token, c.Token);
+	StyleSetFore(InfLexer::Number, c.Number);
 
 	StyleSetFore(STYLE_LINENUMBER, c.MarginText);
 	Execute(SCI_STYLESETBACK, STYLE_LINENUMBER, c.MarginBack);

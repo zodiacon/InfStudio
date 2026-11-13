@@ -34,6 +34,8 @@ extern CAppModule _Module;
 #include <memory>
 #include <format>
 #include <unordered_set>
+#include <string_view>
+#include <wil/resource.h>
 
 // Scintilla and Lexilla come from vcpkg (x64-windows-static)
 #include <scintilla/ScintillaTypes.h>

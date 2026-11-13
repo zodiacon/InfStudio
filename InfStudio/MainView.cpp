@@ -2,6 +2,7 @@
 #include "MainView.h"
 #include "resource.h"
 #include <WTLHelper.h>
+#include "TextFile.h"
 
 BOOL CMainView::PreTranslateMessage(MSG* pMsg) {
 	if (m_fr && m_fr->IsDialogMessage(pMsg))
@@ -11,45 +12,18 @@ BOOL CMainView::PreTranslateMessage(MSG* pMsg) {
 }
 
 bool CMainView::OpenFile(PCWSTR path) {
-	auto hFile = ::CreateFile(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
-	if (hFile == INVALID_HANDLE_VALUE)
+	std::string text;
+	if (!TextFile::Load(path, text, m_Encoding))
 		return false;
 
-	auto size = ::GetFileSize(hFile, nullptr);
-	auto buffer = std::make_unique<char[]>(size + sizeof(WCHAR));
-	DWORD bytes = 0;
-	WORD bom;
-	bool ok = false;
-	if (::ReadFile(hFile, &bom, sizeof(bom), &bytes, nullptr)) {
-		if (bom == 0xfeff) {
-			// Unicode marker
-			size -= sizeof(bom);
-			m_Unicode = true;
-		}
-		else {
-			::SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
-		}
-		bytes = 0;
-		if (::ReadFile(hFile, buffer.get(), size, &bytes, nullptr) && bytes) {
-			if (bom == 0xfeff) {
-				auto s = (WCHAR*)buffer.get();
-				s[bytes / sizeof(WCHAR)] = 0;
-				m_InfView.SetText(CStringA(s));
-			}
-			else {
-				buffer[bytes] = 0;
-				m_InfView.SetText(buffer.get());
-			}
-			m_InfView.SetSavePoint();
-			m_InfView.UpdateLineNumberWidth();
-			m_Path = path;
-			m_Name = m_Path.Mid(m_Path.ReverseFind(L'\\') + 1);
-			BuildTree();
-			ok = true;
-		}
-	}
-	::CloseHandle(hFile);
-	return ok;
+	m_InfView.SetText(text.c_str());
+	m_InfView.EmptyUndoBuffer();
+	m_InfView.SetSavePoint();
+	m_InfView.UpdateLineNumberWidth();
+	m_Path = path;
+	m_Name = m_Path.Mid(m_Path.ReverseFind(L'\\') + 1);
+	BuildTree();
+	return true;
 }
 
 bool CMainView::OnTreeDoubleClick(HWND, HTREEITEM hItem) {
@@ -59,11 +33,12 @@ bool CMainView::OnTreeDoubleClick(HWND, HTREEITEM hItem) {
 		//
 		CString text;
 		m_Tree.GetItemText(hItem, text);
-		auto pos = m_InfView.FindText(Scintilla::FindOption::None, (PCSTR)CStringA(L"[" + text + L"]"));
+		auto section = TextFile::ToUtf8(std::wstring(L"[" + text + L"]"));
+		auto pos = m_InfView.FindText(Scintilla::FindOption::None, section.c_str());
 		if (pos >= 0) {
 			m_InfView.GotoPos(pos);
 			m_InfView.SetSelectionStart(pos);
-			m_InfView.SetSelectionEnd(pos + text.GetLength() + 2);
+			m_InfView.SetSelectionEnd(pos + section.length());
 			PostMessage(WM_SETFOCUS);
 			return true;
 		}
@@ -84,8 +59,12 @@ bool CMainView::CanClose() {
 		int result = AtlMessageBox(m_hWnd, L"Save file before close?", IDS_TITLE, MB_YESNOCANCEL | MB_DEFBUTTON1 | MB_ICONQUESTION);
 		if (result == IDCANCEL)
 			return false;
-		if (result == IDYES)
+		if (result == IDYES) {
 			SendMessage(WM_COMMAND, ID_FILE_SAVE);
+			// not saved (failed, or cancelled in Save As): the file stays open
+			if (m_InfView.IsModified())
+				return false;
+		}
 	}
 	return true;
 }
@@ -104,28 +83,27 @@ void CMainView::UpdateUI() {
 		m_InfView.LineNumber(m_InfView.CurrentPos()) + 1, m_InfView.Column(m_InfView.CurrentPos()) + 1).c_str());
 }
 
+bool CMainView::ConfirmEncoding() {
+	if (m_Encoding != TextEncoding::Ansi || TextFile::FitsAnsi(m_InfView.GetText(m_InfView.Length())))
+		return true;
+
+	// as ANSI, the characters the code page doesn't have would be saved as '?'
+	auto result = AtlMessageBox(m_hWnd,
+		L"The file has characters that can't be saved in the ANSI code page.\n\nSave it as Unicode (UTF-16) instead?",
+		IDS_TITLE, MB_YESNOCANCEL | MB_ICONWARNING);
+	if (result == IDCANCEL)
+		return false;
+	if (result == IDYES)
+		m_Encoding = TextEncoding::Utf16;
+	return true;
+}
+
 bool CMainView::DoSave(PCWSTR path) {
-	auto hFile = ::CreateFile(path, GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, 0, nullptr);
-	if (hFile == INVALID_HANDLE_VALUE)
+	if (!TextFile::Save(path, m_InfView.GetText(m_InfView.Length()), m_Encoding))
 		return false;
 
-	DWORD bytes;
-	BOOL ok;
-	if (m_Unicode) {
-		WORD bom = 0xfeff;
-		::WriteFile(hFile, &bom, sizeof(bom), &bytes, nullptr);
-		auto text = m_InfView.GetText(m_InfView.Length());
-		ok = ::WriteFile(hFile, (PCWSTR)CString(text.c_str()), (DWORD)text.length() * sizeof(WCHAR), &bytes, nullptr);
-	}
-	else {
-		auto text = m_InfView.GetText(m_InfView.Length());
-		ok = ::WriteFile(hFile, text.c_str(), (DWORD)text.length(), &bytes, nullptr);
-	}
-	::CloseHandle(hFile);
-	if (ok) {
-		m_InfView.SetSavePoint();
-	}
-	return ok;
+	m_InfView.SetSavePoint();
+	return true;
 }
 
 void CMainView::BuildTree() {
@@ -200,7 +178,7 @@ LRESULT CMainView::OnSave(WORD, WORD, HWND, BOOL&) {
 	if (!m_InfView.IsModified())
 		return false;
 
-	if (!DoSave(m_Path))
+	if (ConfirmEncoding() && !DoSave(m_Path))
 		DisplaySaveError();
 	return 0;
 }
@@ -315,7 +293,7 @@ LRESULT CMainView::OnFind(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
 			options |= Scintilla::FindOption::MatchCase;
 		if (m_fr->MatchWholeWord())
 			options |= Scintilla::FindOption::WholeWord;
-		auto pos = m_InfView.FindTextW(options, CStringA(m_fr->GetFindString()));
+		auto pos = m_InfView.FindText(options, TextFile::ToUtf8((PCWSTR)m_fr->GetFindString()).c_str());
 		if (pos >= 0) {
 			m_InfView.GotoPos(pos);
 			m_InfView.SetFocus();
@@ -333,12 +311,16 @@ LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/
 	WTLHelper::SuspendHook();
 	auto result = dlg.DoModal(m_hWnd);
 	WTLHelper::ResumeHook();
-	if (result == IDOK) {
-		m_Path = dlg.m_szFileName;
-		m_Name = dlg.m_szFileTitle;
-		Frame()->UpdateTabTitle(m_hWnd, m_Name);
-		if (!DoSave(m_Path))
+	if (result == IDOK && ConfirmEncoding()) {
+		if (DoSave(dlg.m_szFileName)) {
+			// the view's file is the new one only once it's there
+			m_Path = dlg.m_szFileName;
+			m_Name = dlg.m_szFileTitle;
+			Frame()->UpdateTabTitle(m_hWnd, m_Name);
+		}
+		else {
 			DisplaySaveError();
+		}
 	}
 	return 0;
 }

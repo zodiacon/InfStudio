@@ -5,6 +5,7 @@
 #include "TextFile.h"
 #include <IconHelper.h>
 #include <ListViewhelper.h>
+#include <cwctype>
 
 BOOL CMainView::PreTranslateMessage(MSG* pMsg) {
 	if (m_fr && m_fr->IsDialogMessage(pMsg))
@@ -686,10 +687,24 @@ void CMainView::GoToLine(int line) {
 }
 
 bool CMainView::GoToDefinition(LRESULT pos) {
-	auto definition = InfNavigation::FindDefinition(m_InfView.GetText(m_InfView.Length()), pos);
+	auto text = m_InfView.GetText(m_InfView.Length());
+	auto definition = InfNavigation::FindDefinition(text, pos);
 	if (definition == std::string::npos) {
-		Frame()->SetStatusText(0, L"Nothing to go to");
-		return false;
+		// in another INF: an Include's, or a Needs' section in one
+		auto target = InfNavigation::FindIncluded(text, pos, [this](std::string_view file) { return IncludedText(file); });
+		if (!target) {
+			Frame()->SetStatusText(0, L"Nothing to go to");
+			return false;
+		}
+		if (!target->Found) {
+			Frame()->SetStatusText(0, target->File.empty()
+				? std::format(L"[{}] isn't in the INFs this section includes", TextFile::FromUtf8(target->Section)).c_str()
+				: std::format(L"{} isn't next to this file or in %windir%\\INF", TextFile::FromUtf8(target->File)).c_str());
+			return false;
+		}
+		PostMessage(OpenIncludedMessage, 0, reinterpret_cast<LPARAM>(new OpenIncluded{
+			FindIncludedFile(TextFile::FromUtf8(target->File)), TextFile::FromUtf8(target->Section) }));
+		return true;
 	}
 	m_BackPositions.push_back(m_InfView.Execute(SCI_GETCURRENTPOS));
 	if (m_BackPositions.size() > 100)
@@ -796,7 +811,7 @@ void CMainView::FollowCaret() {
 
 void CMainView::ShowCompletion(bool asked) {
 	auto caret = (size_t)m_InfView.Execute(SCI_GETCURRENTPOS);
-	auto list = InfCompletion::Complete(m_InfView.GetText(m_InfView.Length()), caret);
+	auto list = InfCompletion::Complete(m_InfView.GetText(m_InfView.Length()), caret, CompletionContext());
 	if (!list || list->Items.empty()) {
 		if (asked)
 			::MessageBeep(MB_OK);
@@ -955,4 +970,86 @@ void CMainView::Reload() {
 	BuildTree();
 	UpdateUI();
 	Frame()->SetStatusText(0, L"Reloaded: the file changed on disk");
+}
+
+std::wstring CMainView::FindIncludedFile(std::wstring const& name) const {
+	// a file's name, not a path
+	if (name.empty() || name.find_first_of(L"\\/:") != std::wstring::npos)
+		return {};
+	auto exists = [](std::wstring const& path) {
+		auto attributes = ::GetFileAttributes(path.c_str());
+		return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+	};
+	if (auto slash = m_Path.ReverseFind(L'\\'); slash >= 0)
+		if (auto path = std::wstring(m_Path.Left(slash + 1)) + name; exists(path))
+			return path;
+	WCHAR windows[MAX_PATH];
+	if (::GetWindowsDirectory(windows, _countof(windows)))
+		if (auto path = std::wstring(windows) + L"\\INF\\" + name; exists(path))
+			return path;
+	return {};
+}
+
+std::string const* CMainView::IncludedText(std::string_view file) {
+	auto path = FindIncludedFile(TextFile::FromUtf8(file));
+	if (path.empty())
+		return nullptr;
+	auto key = path;
+	std::transform(key.begin(), key.end(), key.begin(), [](wchar_t ch) { return (wchar_t)std::towlower(ch); });
+	auto stamp = TextFile::Stamp(path.c_str());
+	if (auto it = m_Included.find(key); it != m_Included.end() && it->second.Stamp == stamp)
+		return &it->second.Text;
+	IncludedInf inf;
+	TextEncoding encoding;
+	if (!TextFile::Load(path.c_str(), inf.Text, encoding))
+		return nullptr;
+	inf.Stamp = stamp;
+	return &(m_Included[key] = std::move(inf)).Text;
+}
+
+InfCompletion::Context CMainView::CompletionContext() {
+	InfCompletion::Context context;
+	context.Included = [this](std::string_view file) { return IncludedText(file); };
+	// the INFs of a folder (the names)
+	auto list = [](std::wstring const& folder, std::vector<std::string>& names) {
+		WIN32_FIND_DATA data;
+		wil::unique_hfind find(::FindFirstFile((folder + L"*.inf").c_str(), &data));
+		if (find)
+			do {
+				if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+					names.push_back(TextFile::ToUtf8(data.cFileName));
+			} while (::FindNextFile(find.get(), &data));
+	};
+	// %windir%\INF's once (they don't change while the app runs, as far as Include cares), the file's folder's each time
+	static const auto windows = [&] {
+		std::vector<std::string> names;
+		WCHAR windir[MAX_PATH];
+		if (::GetWindowsDirectory(windir, _countof(windir)))
+			list(std::wstring(windir) + L"\\INF\\", names);
+		return names;
+	}();
+	context.InfNames = windows;
+	if (auto slash = m_Path.ReverseFind(L'\\'); slash >= 0)
+		list(std::wstring(m_Path.Left(slash + 1)), context.InfNames);
+	return context;
+}
+
+LRESULT CMainView::OnOpenIncluded(UINT, WPARAM, LPARAM lParam, BOOL&) {
+	std::unique_ptr<OpenIncluded> request(reinterpret_cast<OpenIncluded*>(lParam));
+	if (!Frame()->OpenFileAt(request->Path.c_str(), request->Section.c_str()))
+		AtlMessageBox(m_hWnd, std::format(L"Failed to open {}.", request->Path).c_str(), IDS_TITLE, MB_ICONERROR);
+	return 0;
+}
+
+bool CMainView::GoToSection(PCWSTR name) {
+	auto pos = InfNavigation::FindSection(m_InfView.GetText(m_InfView.Length()), TextFile::ToUtf8(name));
+	if (pos == std::string::npos)
+		return false;
+	// (Alt+Left: back to where this view was)
+	m_BackPositions.push_back(m_InfView.Execute(SCI_GETCURRENTPOS));
+	m_InfView.Execute(SCI_ENSUREVISIBLE, m_InfView.Execute(SCI_LINEFROMPOSITION, pos));
+	m_InfView.Execute(SCI_GOTOPOS, pos);
+	m_InfView.Execute(SCI_VERTICALCENTRECARET);
+	m_InfView.SetFocus();
+	return true;
 }

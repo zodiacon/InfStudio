@@ -263,6 +263,25 @@ LRESULT CMainFrame::OnBrowseDrivers(WORD, WORD, HWND, BOOL&) {
 	return 0;
 }
 
+bool CMainFrame::OpenFileAt(PCWSTR path, PCWSTR section) {
+	// its tab if it has one, else a new one (which AddPage activates)
+	int page = -1;
+	for (int i = 0; i < m_view.GetPageCount(); i++)
+		if (auto view = ViewOfPage(i); view && view->FilePath().CompareNoCase(path) == 0) {
+			page = i;
+			break;
+		}
+	if (page >= 0)
+		m_view.SetActivePage(page);
+	else if (!DoFileOpen(path))
+		return false;
+	if (section && *section)
+		if (auto view = ViewOfPage(m_view.GetActivePage()))
+			view->GoToSection(section);
+	UpdateUI();
+	return true;
+}
+
 bool CMainFrame::OpenFile(PCWSTR path) {
 	auto ok = DoFileOpen(path);
 	UpdateUI();

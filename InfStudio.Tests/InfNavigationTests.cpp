@@ -112,3 +112,71 @@ TEST_CASE("A one-letter string key", "[navigation]") {
 	CHECK(InfNavigation::StringValueAt(text, pos) == "Device");
 	CHECK(InfNavigation::FindDefinition(text, pos) == text.find("D = "));
 }
+
+namespace {
+	// INFs an INF can include, by file name (whatever its case)
+	struct Includable {
+		std::vector<std::pair<std::string, std::string>> Files = {
+			{ "machine.inf", "[Version]\r\nSignature = \"$Windows NT$\"\r\n[PCI_DRV]\r\nAddReg = PCI_AddReg\r\n[PCI_DRV.Services]\r\nAddService = pci, 2, pci_svc\r\n[PCI_AddReg]\r\n[Strings]\r\nA = \"a\"\r\n[Strings.0407]\r\nA = \"b\"\r\n[SourceDisksNames.amd64]\r\n1 = x\r\n" },
+			{ "usb.inf", "[USB.Dev.NT]\r\nAddReg = y\r\n" },
+		};
+		std::string const* operator()(std::string_view file) const {
+			for (auto const& [name, text] : Files)
+				if (_strnicmp(name.c_str(), file.data(), file.size()) == 0 && name.size() == file.size())
+					return &text;
+			return nullptr;
+		}
+	};
+}
+
+TEST_CASE("A section's header", "[navigation]") {
+	CHECK(InfNavigation::FindSection(Text, "drivers") == Line(9));
+	CHECK(InfNavigation::FindSection(Text, "Strings.0407") == Line(17));
+	CHECK(InfNavigation::FindSection(Text, "Nowhere") == std::string::npos);
+	CHECK(InfNavigation::FindSection("", "Version") == std::string::npos);
+}
+
+TEST_CASE("Include and Needs: what they name in other INFs", "[navigation]") {
+	const std::string text =
+		"[Install.NT]\r\n"
+		"Include = machine.inf, USB.INF, nothere.inf\r\n"
+		"Needs = PCI_DRV, USB.Dev.NT, Nowhere ; pci_drv\r\n"
+		"CopyFiles = PCI_DRV\r\n"
+		"[Install.NT.Services]\r\n"
+		"Include = machine.inf\r\n"
+		"Needs = pci_drv.services, USB.Dev.NT\r\n"
+		"[Other]\r\n"
+		"Needs = USB.Dev.NT\r\n";
+	Includable included;
+	auto at = [&](std::string_view what, int occurrence = 1) {
+		size_t pos = std::string::npos;
+		for (int i = 0; i < occurrence; i++)
+			pos = text.find(what, pos == std::string::npos ? 0 : pos + 1);
+		REQUIRE(pos != std::string::npos);
+		return InfNavigation::FindIncluded(text, pos + 1, included);
+	};
+	auto is = [](std::optional<InfNavigation::IncludedTarget> const& t, std::string_view file, std::string_view section, bool found) {
+		return t && t->File == file && t->Section == section && t->Found == found;
+	};
+
+	// an Include's file: the INF (if it's there)
+	CHECK(is(at("machine.inf"), "machine.inf", "", true));
+	CHECK(is(at("USB.INF"), "USB.INF", "", true));
+	CHECK(is(at("nothere.inf"), "nothere.inf", "", false));
+
+	// a Needs' section: in the first of the INFs the section includes that has it (whatever its case)
+	CHECK(is(at("PCI_DRV"), "machine.inf", "PCI_DRV", true));
+	CHECK(is(at("USB.Dev.NT"), "USB.INF", "USB.Dev.NT", true));
+	CHECK(is(at("pci_drv.services"), "machine.inf", "pci_drv.services", true));
+	CHECK(is(at("Nowhere"), "", "Nowhere", false));
+	// a section with an Include of its own looks only there
+	CHECK(is(at("USB.Dev.NT", 2), "", "USB.Dev.NT", false));
+	// one without: in every INF the file includes
+	CHECK(is(at("USB.Dev.NT", 3), "USB.INF", "USB.Dev.NT", true));
+
+	// not: the key, a comment, another directive; nothing to read the other INFs with
+	CHECK_FALSE(at("Needs"));
+	CHECK_FALSE(at("pci_drv"));
+	CHECK_FALSE(at("PCI_DRV", 2));
+	CHECK(is(InfNavigation::FindIncluded(text, text.find("PCI_DRV") + 1, {}), "", "PCI_DRV", false));
+}

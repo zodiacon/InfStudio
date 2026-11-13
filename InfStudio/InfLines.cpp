@@ -220,3 +220,26 @@ bool InfLines::InfModel::IsListSection(std::string_view section) const {
 	return KindOf(section) == SectionKind::None && !In(StandardSections, section) && !In(Named(ReferenceKind::Models), section)
 		&& !StartsWithNoCase(section, "Strings.") && !StartsWithNoCase(section, "SourceDisks") && !EqualNoCase(section, "ControlFlags");
 }
+
+std::vector<std::string_view> InfLines::IncludedFiles(std::vector<StyledLine> const& lines, std::string_view section) {
+	std::vector<std::string_view> own, all;
+	auto add = [](std::vector<std::string_view>& files, std::string_view file) {
+		if (!file.empty() && std::none_of(files.begin(), files.end(), [&](auto f) { return EqualNoCase(f, file); }))
+			files.push_back(file);
+	};
+	std::string_view current;
+	for (auto const& line : lines) {
+		if (auto name = SectionName(line)) {
+			current = *name;
+			continue;
+		}
+		if (!EqualNoCase(KeyOf(line), "Include"))
+			continue;
+		for (auto const& field : ValueFields(line)) {
+			add(all, field.Text);
+			if (EqualNoCase(current, section))
+				add(own, field.Text);
+		}
+	}
+	return own.empty() ? all : own;
+}

@@ -59,7 +59,7 @@ namespace {
 	}
 }
 
-std::optional<InfCompletion::List> InfCompletion::Complete(std::string_view text, size_t caret) {
+std::optional<InfCompletion::List> InfCompletion::Complete(std::string_view text, size_t caret, Context const& context) {
 	InfModel model(text);
 	auto line = LineAt(model.Lines, caret);
 	if (!line)
@@ -146,6 +146,27 @@ std::optional<InfCompletion::List> InfCompletion::Complete(std::string_view text
 		}
 	if (!Trim(line->Text.substr(fieldStart, wordStart - fieldStart)).empty())
 		return {};
+	// other INFs, and their sections
+	if (EqualNoCase(key, "Include"))
+		return List{ line->Start + wordStart, Unique(Names(context.InfNames.begin(), context.InfNames.end())), "" };
+	if (EqualNoCase(key, "Needs")) {
+		Names sections;
+		if (context.Included)
+			for (auto file : IncludedFiles(model.Lines, section))
+				if (auto other = context.Included(file)) {
+					// (the names are in the other's text, which stays: not in its model)
+					InfModel included(*other);
+					for (auto name : included.Defined) {
+						// not [Version], [Strings], [SourceDisksNames.amd64]...: what every INF has, not to be needed
+						bool standard = std::any_of(StandardSections.begin(), StandardSections.end(), [&](auto s) {
+							return EqualNoCase(name, s) || (name.size() > s.size() && name[s.size()] == '.' && EqualNoCase(name.substr(0, s.size()), s));
+						});
+						if (!standard)
+							sections.push_back(name);
+					}
+				}
+		return List{ line->Start + wordStart, Unique(sections), "" };
+	}
 	bool names = In(SectionValueKeys, key) || (EqualNoCase(key, "AddService") && field == 2)
 		|| ((EqualNoCase(key, "KmdfService") || EqualNoCase(key, "UmdfService")) && field == 1);
 	if (!names)

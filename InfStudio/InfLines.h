@@ -6,6 +6,7 @@
 #include <optional>
 #include <cstdint>
 #include <memory>
+#include <functional>
 
 //
 // An INF's text (UTF-8) as lines styled by InfLexer, and what InfNavigation and InfCompletion read from them.
@@ -36,6 +37,13 @@ namespace InfLines {
 		std::string_view Text;
 	};
 	std::vector<Field> ValueFields(StyledLine const& line);
+
+	// The INFs a section's Include lines name; if it has none, every INF the text includes (so that a Needs in a
+	// section without an Include of its own still has somewhere to look). Each once, whatever its case.
+	std::vector<std::string_view> IncludedFiles(std::vector<StyledLine> const& lines, std::string_view section);
+	// an included INF's text (UTF-8) by its file name, or null if it isn't found (what InfNavigation and InfCompletion
+	// are given to read other INFs: they don't read files themselves)
+	using IncludedText = std::function<std::string const*(std::string_view file)>;
 
 	//
 	// What an INF's text has and what its directives name: the sections, the string keys, the files of

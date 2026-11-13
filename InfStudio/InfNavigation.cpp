@@ -118,6 +118,52 @@ size_t InfNavigation::FindDefinition(std::string_view text, size_t pos) {
 	return std::string_view::npos;
 }
 
+size_t InfNavigation::FindSection(std::string_view text, std::string_view name) {
+	for (auto const& line : StyleLines(text))
+		if (auto section = SectionName(line); section && EqualNoCase(*section, name))
+			return line.Start + line.Text.find('[');
+	return std::string_view::npos;
+}
+
+std::optional<InfNavigation::IncludedTarget> InfNavigation::FindIncluded(std::string_view text, size_t pos, IncludedText const& included) {
+	auto lines = StyleLines(text);
+	auto line = LineAt(lines, pos);
+	if (!line)
+		return {};
+	auto key = KeyOf(*line);
+	bool include = EqualNoCase(key, "Include"), needs = EqualNoCase(key, "Needs");
+	if (!include && !needs)
+		return {};
+	// in the value: after the '='
+	auto offset = pos - line->Start;
+	size_t eq = std::string_view::npos;
+	for (size_t i = 0; i < line->Text.size(); i++)
+		if (line->Styles[i] == Operator && line->Text[i] == '=') {
+			eq = i;
+			break;
+		}
+	if (eq == std::string_view::npos || offset <= eq)
+		return {};
+	auto field = FieldAt(*line, offset);
+	if (!field)
+		return {};
+	if (include)
+		return IncludedTarget{ std::string(*field), {}, included && included(*field) != nullptr };
+
+	// the section the line is in
+	std::string_view section;
+	for (auto i = line - lines.data(); i >= 0; i--)
+		if (auto name = SectionName(lines[i])) {
+			section = *name;
+			break;
+		}
+	if (included)
+		for (auto file : IncludedFiles(lines, section))
+			if (auto other = included(file); other && FindSection(*other, *field) != std::string_view::npos)
+				return IncludedTarget{ std::string(file), std::string(*field), true };
+	return IncludedTarget{ {}, std::string(*field), false };
+}
+
 std::optional<std::string> InfNavigation::StringValueAt(std::string_view text, size_t pos) {
 	auto lines = StyleLines(text);
 	auto line = LineAt(lines, pos);

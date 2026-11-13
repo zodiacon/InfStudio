@@ -19,6 +19,7 @@
 #include <set>
 #include <filesystem>
 #include <thread>
+#include <unordered_map>
 
 class CMainView : 
 	public CViewBase<CMainView>,
@@ -36,6 +37,10 @@ public:
 	bool CanClose() override;
 	void FontChanged() override;
 	void CheckFileChanged() override;
+	CString FilePath() const override {
+		return m_Path;
+	}
+	bool GoToSection(PCWSTR name) override;
 	~CMainView();
 	void LiveAnalysisChanged() override;
 
@@ -54,6 +59,7 @@ public:
 		MESSAGE_HANDLER(WM_TIMER, OnTimer)
 		MESSAGE_HANDLER(ValidatedMessage, OnValidated)
 		MESSAGE_HANDLER(CheckFileMessage, OnCheckFile)
+		MESSAGE_HANDLER(OpenIncludedMessage, OnOpenIncluded)
 		NOTIFY_CODE_HANDLER(TVN_KEYDOWN, OnTreeKeyDown)
 		COMMAND_ID_HANDLER(ID_EDIT_FIND, OnEditFind)
 		COMMAND_ID_HANDLER(ID_EDIT_REPLACE, OnEditReplace)
@@ -256,6 +262,23 @@ private:
 	CString m_SearchText, m_ReplaceText;
 	SearchOptions m_Search;
 	std::vector<LRESULT> m_BackPositions;
+
+	// Include and Needs: the INFs the text includes, found next to the file or else in %windir%\INF, read when needed
+	// (again if one changed); the ones that can be included, for auto-complete.
+	struct IncludedInf {
+		std::string Text;
+		std::optional<FileStamp> Stamp;
+	};
+	std::wstring FindIncludedFile(std::wstring const& name) const;
+	std::string const* IncludedText(std::string_view file);
+	InfCompletion::Context CompletionContext();
+	std::unordered_map<std::wstring, IncludedInf> m_Included;	// by path, lower case
+	// (the other INF opened after the Ctrl+click that asked for it is done with: the request in lParam)
+	struct OpenIncluded {
+		std::wstring Path, Section;
+	};
+	static constexpr UINT OpenIncludedMessage = WM_APP + 12;
+	LRESULT OnOpenIncluded(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	std::wstring m_CaretSection;
 	TextEncoding m_Encoding{ TextEncoding::Ansi };
 	bool m_Unsaved{ false };

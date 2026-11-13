@@ -10,6 +10,8 @@ struct IMainFrame abstract {
 	virtual bool UpdateTabTitle(HWND tab, PCWSTR title) = 0;
 	// a file in a tab of its own (and in the recent files); false if it couldn't be opened
 	virtual bool OpenFile(PCWSTR path) = 0;
+	// the file's tab (opened if it isn't), at a section if one is given (IView::GoToSection)
+	virtual bool OpenFileAt(PCWSTR path, PCWSTR section) = 0;
 };
 
 struct IView {
@@ -24,4 +26,12 @@ struct IView {
 	virtual void LiveAnalysisChanged() {}
 	// the app is active again: the file the tab shows may have changed on disk
 	virtual void CheckFileChanged() {}
+	// the file the tab shows (empty if none, or not saved yet)
+	virtual CString FilePath() const {
+		return L"";
+	}
+	// the caret to a section's header; false if there's none of that name
+	virtual bool GoToSection(PCWSTR /*name*/) {
+		return false;
+	}
 };

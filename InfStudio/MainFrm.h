@@ -91,6 +91,7 @@ private:
 	HICON GetInfIcon() const override;
 	bool UpdateTabTitle(HWND tab, PCWSTR title) override;
 	bool OpenFile(PCWSTR path) override;
+	bool OpenFileAt(PCWSTR path, PCWSTR section) override;
 
 	// Handler prototypes (uncomment arguments if needed):
 	//	LRESULT MessageHandler(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)

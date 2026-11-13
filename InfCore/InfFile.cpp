@@ -2,6 +2,7 @@
 #include "InfFile.h"
 #include <cassert>
 #include <array>
+#include <algorithm>
 
 #pragma comment(lib, "setupapi")
 
@@ -115,18 +116,57 @@ namespace {
 			return {};
 		return text.substr(first, text.find_last_not_of(blanks) - first + 1);
 	}
+
+	// the comma separated fields of a value, trimmed (empty ones included)
+	std::vector<std::wstring_view> Fields(std::wstring_view value) {
+		std::vector<std::wstring_view> fields;
+		for (size_t pos = 0;;) {
+			auto comma = value.find(L',', pos);
+			fields.push_back(Trim(value.substr(pos, comma == std::wstring_view::npos ? std::wstring_view::npos : comma - pos)));
+			if (comma == std::wstring_view::npos)
+				break;
+			pos = comma + 1;
+		}
+		return fields;
+	}
+}
+
+std::vector<std::wstring> InfFile::InstallSectionNames(std::wstring_view installSection) {
+	auto name = Trim(installSection);
+	if (name.empty())
+		return {};
+	std::vector<std::wstring> names;
+	for (auto decoration : { L"", L".NT", L".NTamd64", L".NTarm64", L".NTx86", L".NTarm", L".NTia64" }) {
+		auto section = std::wstring(name) + decoration;
+		names.push_back(section);
+		names.push_back(section + L".HW");
+	}
+	return names;
+}
+
+std::vector<InstallDirective> InfFile::GetInstallDirectives(std::wstring_view installSection) const {
+	std::vector<InstallDirective> directives;
+	for (auto const& section : InstallSectionNames(installSection)) {
+		for (auto directive : { L"CopyFiles", L"DelFiles", L"AddReg", L"DelReg" }) {
+			for (auto const& [key, value] : GetSectionCompactLines(section.c_str())) {
+				if (_wcsicmp(key.c_str(), directive) != 0)
+					continue;
+				for (auto target : Fields(value)) {
+					auto exists = [&](InstallDirective const& d) {
+						return d.Section == section && d.Directive == directive && _wcsicmp(d.Target.c_str(), std::wstring(target).c_str()) == 0;
+					};
+					// (empty fields name nothing; a target named twice counts once)
+					if (!target.empty() && std::none_of(directives.begin(), directives.end(), exists))
+						directives.push_back({ section, directive, std::wstring(target) });
+				}
+			}
+		}
+	}
+	return directives;
 }
 
 std::vector<std::wstring> InfFile::GetModelSections(std::wstring_view value) {
-	std::vector<std::wstring_view> fields;
-	for (size_t pos = 0;;) {
-		auto comma = value.find(L',', pos);
-		fields.push_back(Trim(value.substr(pos, comma == std::wstring_view::npos ? std::wstring_view::npos : comma - pos)));
-		if (comma == std::wstring_view::npos)
-			break;
-		pos = comma + 1;
-	}
-
+	auto fields = Fields(value);
 	auto name = fields[0];
 	if (name.empty())
 		return {};

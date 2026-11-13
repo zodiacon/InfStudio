@@ -1,5 +1,12 @@
 #pragma once
 
+// a section a directive of an install section names: "CopyFiles = Drivers" in [Install.NTamd64]
+struct InstallDirective {
+	std::wstring Section;		// the install section it is in (with its decorations)
+	std::wstring Directive;		// CopyFiles, DelFiles, AddReg or DelReg
+	std::wstring Target;		// the section it names
+};
+
 class InfFile {
 public:
 	~InfFile();
@@ -22,6 +29,11 @@ public:
 	// The models sections a Manufacturer line's value names: "Name" names [Name], "Name,NTamd64,NTarm64" names
 	// [Name.NTamd64] and [Name.NTarm64]. Blanks around the fields don't count.
 	static std::vector<std::wstring> GetModelSections(std::wstring_view value);
+	// The sections an install section named in a models section can be: the name with each platform decoration
+	// Windows chooses from (none, .NT, .NTamd64, .NTarm64...), each followed by its .HW section.
+	static std::vector<std::wstring> InstallSectionNames(std::wstring_view installSection);
+	// the CopyFiles, DelFiles, AddReg and DelReg entries of those sections that the file has, in that order
+	std::vector<InstallDirective> GetInstallDirectives(std::wstring_view installSection) const;
 
 private:
 	bool Init();

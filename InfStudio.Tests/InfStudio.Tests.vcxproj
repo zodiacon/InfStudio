@@ -75,7 +75,7 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(VcpkgRoot)installed\x64-windows-static\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Catch2Maind.lib;Catch2d.lib;Lexilla.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Catch2Maind.lib;Catch2d.lib;Lexilla.lib;Scintilla.lib;imm32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -89,7 +89,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(VcpkgRoot)installed\x64-windows-static\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Catch2Main.lib;Catch2.lib;Lexilla.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Catch2Main.lib;Catch2.lib;Lexilla.lib;Scintilla.lib;imm32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -100,9 +100,13 @@
     <ClCompile Include="TextFileTests.cpp" />
     <ClCompile Include="InfFileTests.cpp" />
     <ClCompile Include="InfTemplatesTests.cpp" />
+    <ClCompile Include="EditorSearchTests.cpp" />
+    <ClCompile Include="InfVerifTests.cpp" />
     <ClCompile Include="..\InfStudio\InfLexer.cpp" />
     <ClCompile Include="..\InfStudio\TextFile.cpp" />
     <ClCompile Include="..\InfStudio\InfTemplates.cpp" />
+    <ClCompile Include="..\InfStudio\EditorSearch.cpp" />
+    <ClCompile Include="..\InfStudio\InfVerif.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\InfCore\InfCore.vcxproj">

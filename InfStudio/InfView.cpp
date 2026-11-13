@@ -12,16 +12,22 @@ namespace {
 	struct EditorColors {
 		COLORREF Back, Text, Comment, Section, Key, Operator, String, Token, Number;
 		COLORREF Caret, Selection, CaretLine, MarginBack, MarginText;
+		COLORREF ErrorMark, WarningMark;
 	};
+
+	// the indicators that mark InfVerif's problems
+	constexpr int ErrorIndicator = 8, WarningIndicator = 9;
 
 	constexpr EditorColors LightColors{
 		RGB(255, 255, 255), RGB(0, 0, 0), RGB(0, 128, 0), RGB(160, 0, 0), RGB(0, 0, 160), RGB(90, 90, 90), RGB(0, 128, 128), RGB(128, 0, 128), RGB(152, 104, 1),
 		RGB(0, 0, 0), RGB(173, 214, 255), RGB(242, 246, 252), RGB(240, 240, 240), RGB(130, 130, 130),
+		RGB(228, 0, 0), RGB(200, 140, 0),
 	};
 
 	constexpr EditorColors DarkColors{
 		RGB(30, 30, 30), RGB(212, 212, 212), RGB(106, 153, 85), RGB(86, 156, 214), RGB(156, 220, 254), RGB(170, 170, 170), RGB(206, 145, 120), RGB(197, 134, 192), RGB(181, 206, 168),
 		RGB(220, 220, 220), RGB(38, 79, 120), RGB(42, 45, 46), RGB(37, 37, 38), RGB(133, 133, 133),
+		RGB(241, 76, 76), RGB(205, 173, 0),
 	};
 }
 
@@ -74,6 +80,11 @@ void CInfView::ApplyColors() {
 	Execute(SCI_SETFOLDMARGINCOLOUR, TRUE, c.MarginBack);
 	Execute(SCI_SETFOLDMARGINHICOLOUR, TRUE, c.MarginBack);
 
+	Execute(SCI_INDICSETSTYLE, ErrorIndicator, INDIC_SQUIGGLE);
+	Execute(SCI_INDICSETFORE, ErrorIndicator, c.ErrorMark);
+	Execute(SCI_INDICSETSTYLE, WarningIndicator, INDIC_SQUIGGLE);
+	Execute(SCI_INDICSETFORE, WarningIndicator, c.WarningMark);
+
 	UpdateLineNumberWidth();
 	Execute(SCI_COLOURISE, 0, -1);
 }
@@ -85,6 +96,26 @@ void CInfView::UpdateLineNumberWidth() {
 		strcat_s(digits, "9");
 	auto width = (int)Execute(SCI_TEXTWIDTH, STYLE_LINENUMBER, reinterpret_cast<LPARAM>(digits));
 	Execute(SCI_SETMARGINWIDTHN, 0, width);
+}
+
+void CInfView::ShowProblems(std::vector<Problem> const& problems) {
+	auto length = Execute(SCI_GETLENGTH);
+	for (auto indicator : { ErrorIndicator, WarningIndicator }) {
+		Execute(SCI_SETINDICATORCURRENT, indicator);
+		Execute(SCI_INDICATORCLEARRANGE, 0, length);
+	}
+	auto lines = (int)Execute(SCI_GETLINECOUNT);
+	for (auto const& problem : problems) {
+		if (problem.Line < 1 || problem.Line > lines)
+			continue;
+		// the line's text, without its indentation
+		auto start = Execute(SCI_GETLINEINDENTPOSITION, problem.Line - 1);
+		auto end = Execute(SCI_GETLINEENDPOSITION, problem.Line - 1);
+		if (end <= start)
+			continue;
+		Execute(SCI_SETINDICATORCURRENT, problem.Error ? ErrorIndicator : WarningIndicator);
+		Execute(SCI_INDICATORFILLRANGE, start, end - start);
+	}
 }
 
 LRESULT CInfView::OnThemeChanged(UINT, WPARAM, LPARAM, BOOL&) {

@@ -17,6 +17,11 @@
 const int WINDOW_MENU_POSITION = 5;
 
 BOOL CMainFrame::PreTranslateMessage(MSG* pMsg) {
+	// Keys in a modeless dialog (Find, Replace) are the dialog's: the frame's shortcuts would take Ctrl+V and the like
+	// from its text boxes and give them to the editor.
+	if (pMsg->hwnd && ::GetAncestor(pMsg->hwnd, GA_ROOT) != m_hWnd)
+		return m_view.PreTranslateMessage(pMsg);
+
 	if (CFrameWindowImpl<CMainFrame>::PreTranslateMessage(pMsg))
 		return TRUE;
 
@@ -398,7 +403,8 @@ void CMainFrame::UpdateUI() {
 	if (count == 0) {
 		UINT ids[] = {
 			ID_WINDOW_CLOSE, ID_WINDOW_CLOSE_ALL, ID_FILE_CLOSE, ID_FILE_SAVE, ID_FILE_SAVE_AS, ID_EDIT_COPY,
-			ID_EDIT_PASTE, ID_EDIT_CUT, ID_EDIT_UNDO, ID_EDIT_REDO, ID_VIEW_REFRESH
+			ID_EDIT_PASTE, ID_EDIT_CUT, ID_EDIT_UNDO, ID_EDIT_REDO, ID_VIEW_REFRESH, ID_EDIT_DELETE,
+			ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS
 		};
 		for (auto id : ids)
 			UIEnable(id, false);

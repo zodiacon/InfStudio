@@ -78,16 +78,23 @@ BEGIN
         MENUITEM "&Paste\tCtrl+V",              ID_EDIT_PASTE
         MENUITEM "&Delete\tDel",                ID_EDIT_DELETE
         MENUITEM "Clear A&ll",                  ID_EDIT_CLEAR_ALL
+        MENUITEM SEPARATOR
+        MENUITEM "&Find...\tCtrl+F",            ID_EDIT_FIND
+        MENUITEM "Find &Next\tF3",              ID_EDIT_REPEAT
+        MENUITEM "Find Pre&vious\tShift+F3",    ID_EDIT_FIND_PREVIOUS
+        MENUITEM "R&eplace...\tCtrl+H",         ID_EDIT_REPLACE
     END
     POPUP "&View"
     BEGIN
         MENUITEM "&Refresh\tF5",                ID_VIEW_REFRESH
         MENUITEM SEPARATOR
         MENUITEM "&Status Bar",                 ID_VIEW_STATUS_BAR
+        MENUITEM "Validation &Results",         ID_VIEW_RESULTS
     END
     POPUP "&INF"
     BEGIN
-        MENUITEM "&Validate",                   ID_INF_VALIDATE
+        MENUITEM "&Validate\tF7",               ID_INF_VALIDATE
+        MENUITEM "Validate for &WHQL",          ID_INF_VALIDATE_WHQL
     END
     POPUP "&Options"
     BEGIN
@@ -205,6 +212,9 @@ BEGIN
     VK_DELETE,      ID_EDIT_CUT,            VIRTKEY, SHIFT, NOINVERT
     "X",            ID_EDIT_CUT,            VIRTKEY, CONTROL, NOINVERT
     "F",            ID_EDIT_FIND,           VIRTKEY, CONTROL, NOINVERT
+    "H",            ID_EDIT_REPLACE,        VIRTKEY, CONTROL, NOINVERT
+    VK_F3,          ID_EDIT_REPEAT,         VIRTKEY, NOINVERT
+    VK_F3,          ID_EDIT_FIND_PREVIOUS,  VIRTKEY, SHIFT, NOINVERT
     "V",            ID_EDIT_PASTE,          VIRTKEY, CONTROL, NOINVERT
     VK_INSERT,      ID_EDIT_PASTE,          VIRTKEY, SHIFT, NOINVERT
     VK_BACK,        ID_EDIT_UNDO,           VIRTKEY, ALT, NOINVERT
@@ -216,6 +226,7 @@ BEGIN
     VK_F6,          ID_NEXT_PANE,           VIRTKEY, NOINVERT
     VK_F6,          ID_PREV_PANE,           VIRTKEY, SHIFT, NOINVERT
     VK_F5,          ID_VIEW_REFRESH,        VIRTKEY, NOINVERT
+    VK_F7,          ID_INF_VALIDATE,        VIRTKEY, NOINVERT
 END
 
 

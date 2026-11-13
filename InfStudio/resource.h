@@ -39,13 +39,15 @@
 #define ID_RECENTFILES_                 32783
 #define ID_FILE_CLOSE32786              32786
 #define ID_VIEW_REFRESH32787            32787
+#define ID_INF_VALIDATE_WHQL            32790
+#define ID_VIEW_RESULTS                 32791
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        224
-#define _APS_NEXT_COMMAND_VALUE         32790
+#define _APS_NEXT_COMMAND_VALUE         32792
 #define _APS_NEXT_CONTROL_VALUE         1000
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

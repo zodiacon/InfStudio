@@ -476,7 +476,13 @@ class CScintillaCommands {
 		COMMAND_ID_HANDLER(ID_EDIT_UNDO, OnUndo)
 		COMMAND_ID_HANDLER(ID_EDIT_REDO, OnRedo)
 		COMMAND_ID_HANDLER(ID_EDIT_CLEAR_ALL, OnClearAll)
+		COMMAND_ID_HANDLER(ID_EDIT_DELETE, OnDelete)
 	END_MSG_MAP()
+
+	LRESULT OnDelete(WORD, WORD, HWND, BOOL&) {
+		static_cast<T*>(this)->Execute(SCI_CLEAR);
+		return 0;
+	}
 
 	LRESULT OnPaste(WORD, WORD, HWND, BOOL&) {
 		static_cast<T*>(this)->Paste();

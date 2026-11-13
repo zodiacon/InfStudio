@@ -22,6 +22,12 @@ public:
 
 	// the line number margin wide enough for the document's line count (at least 4 digits)
 	void UpdateLineNumberWidth();
+	// squiggles under the lines with problems (1-based; error or warning), instead of those there were
+	struct Problem {
+		int Line;
+		bool Error;
+	};
+	void ShowProblems(std::vector<Problem> const& problems);
 
 private:
 	// the editor's colors for the current mode (light or dark); Scintilla draws itself, so dark mode doesn't reach it

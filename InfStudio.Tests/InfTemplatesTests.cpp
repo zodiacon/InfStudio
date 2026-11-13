@@ -3,6 +3,7 @@
 #include "InfLexer.h"
 #include "InfFile.h"
 #include "TextFile.h"
+#include "InfVerif.h"
 
 #include <algorithm>
 #include <cwctype>
@@ -56,38 +57,6 @@ namespace {
 			pos = end + 2;
 		}
 		return keys;
-	}
-
-	// infverif.exe of the newest WDK, or empty
-	std::filesystem::path FindInfVerif() {
-		std::filesystem::path tools = LR"(C:\Program Files (x86)\Windows Kits\10\Tools)";
-		std::error_code ec;
-		std::filesystem::path found;
-		for (auto const& dir : std::filesystem::directory_iterator(tools, ec)) {
-			auto exe = dir.path() / L"x64" / L"infverif.exe";
-			if (std::filesystem::exists(exe, ec) && (found.empty() || exe > found))
-				found = exe;
-		}
-		return found;
-	}
-
-	struct ProcessResult {
-		int ExitCode;
-		std::string Output;
-	};
-
-	ProcessResult Run(std::wstring const& commandLine) {
-		std::wstring command = L"\"" + commandLine + L" 2>&1\"";
-		ProcessResult result{ -1 };
-		auto pipe = _wpopen(command.c_str(), L"rb");
-		if (!pipe)
-			return result;
-		char buffer[512];
-		size_t read;
-		while ((read = fread(buffer, 1, sizeof(buffer), pipe)) > 0)
-			result.Output.append(buffer, read);
-		result.ExitCode = _pclose(pipe);
-		return result;
 	}
 }
 
@@ -168,7 +137,7 @@ TEST_CASE("Every template makes a good INF", "[templates]") {
 }
 
 TEST_CASE("Every template passes InfVerif", "[templates][infverif]") {
-	auto infverif = FindInfVerif();
+	auto infverif = InfVerif::Find();
 	if (infverif.empty())
 		SKIP("the WDK's infverif.exe isn't installed");
 
@@ -178,7 +147,9 @@ TEST_CASE("Every template passes InfVerif", "[templates][infverif]") {
 	file.Write(InfTemplates::Generate(t, InfTemplates::NewValues()));
 
 	// /w: Windows Driver requirements
-	auto result = Run(L"\"" + infverif.wstring() + L"\" /w \"" + file.Path().wstring() + L"\"");
+	auto result = InfVerif::Run(infverif, L"/w", file.Path());
 	CAPTURE(result.Output);
+	REQUIRE(result.Ran);
+	CHECK(result.Messages.empty());
 	CHECK(result.ExitCode == 0);
 }

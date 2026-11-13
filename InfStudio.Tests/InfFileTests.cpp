@@ -146,3 +146,53 @@ TEST_CASE("Models sections of a real Manufacturer section", "[inffile]") {
 	for (auto const& section : all)
 		CHECK(inf.SectionExists(section.c_str()));
 }
+
+TEST_CASE("The sections an install section can be", "[inffile]") {
+	// the platform decorations Windows picks from, each with its .HW section
+	auto names = InfFile::InstallSectionNames(L"Install");
+	auto has = [&](PCWSTR name) { return std::find(names.begin(), names.end(), name) != names.end(); };
+	for (auto name : { L"Install", L"Install.NT", L"Install.NTamd64", L"Install.NTarm64", L"Install.NTx86",
+		L"Install.HW", L"Install.NT.HW", L"Install.NTamd64.HW", L"Install.NTarm64.HW" })
+		CHECK(has(name));
+	// .HW goes after the platform, not before it
+	CHECK_FALSE(has(L"Install.HW.NT"));
+	CHECK(InfFile::InstallSectionNames(L"").empty());
+}
+
+TEST_CASE("The directives of an install section, with its decorations", "[inffile]") {
+	TempFile file(L"decorations.inf");
+	file.Write(
+		"[Version]\r\n"
+		"Signature = \"$Windows NT$\"\r\n"
+		"[Install]\r\n"
+		"CopyFiles = Legacy.Files\r\n"
+		"[Install.NTamd64]\r\n"
+		"CopyFiles = Amd64.Files, Common.Files\r\n"
+		"DelFiles  = Old.Files\r\n"
+		"[Install.NTarm64]\r\n"
+		"CopyFiles = Arm64.Files,, Common.Files\r\n"
+		"[Install.NTamd64.HW]\r\n"
+		"AddReg = Hw.AddReg\r\n"
+		"DelReg = Hw.DelReg\r\n"
+		"Include = other.inf\r\n"
+		"[Amd64.Files]\r\n"
+		"a.sys\r\n");
+	InfFile inf;
+	REQUIRE(inf.Open(file.c_str()));
+
+	auto directives = inf.GetInstallDirectives(L"Install");
+	std::vector<std::wstring> found;
+	for (auto const& d : directives)
+		found.push_back(d.Section + L": " + d.Directive + L" " + d.Target);
+	CHECK(found == std::vector<std::wstring>{
+		L"Install: CopyFiles Legacy.Files",
+		L"Install.NTamd64: CopyFiles Amd64.Files",
+		L"Install.NTamd64: CopyFiles Common.Files",
+		L"Install.NTamd64: DelFiles Old.Files",
+		L"Install.NTamd64.HW: AddReg Hw.AddReg",
+		L"Install.NTamd64.HW: DelReg Hw.DelReg",
+		L"Install.NTarm64: CopyFiles Arm64.Files",
+		L"Install.NTarm64: CopyFiles Common.Files",
+	});
+	CHECK(inf.GetInstallDirectives(L"NoSuchSection").empty());
+}

@@ -18,6 +18,12 @@ struct TextFile {
 	// false if the text has characters the ANSI code page can't hold (saving it as ANSI would turn them into '?')
 	static bool FitsAnsi(std::string_view utf8);
 
+	// A file to open read-only: Windows' (under its folder, as %windir%\INF and the driver store are: not to be edited even
+	// by an administrator), marked read-only, or one that can't be opened for writing.
+	static bool ShouldOpenReadOnly(PCWSTR path);
+	// whether path is in folder (or deeper), by whole names, whatever their case
+	static bool IsUnder(std::wstring_view path, std::wstring_view folder);
+
 	static std::string ToUtf8(std::wstring_view text);
 	static std::wstring FromUtf8(std::string_view text);
 };

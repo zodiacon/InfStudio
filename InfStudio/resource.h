@@ -49,13 +49,20 @@
 #define ID_ENCODING_ANSI                32797
 #define ID_ENCODING_UTF8                32798
 #define ID_ENCODING_UTF16               32799
+#define ID_FILE_READONLY                32800
+#define ID_DRIVER_OPEN                  32801
+#define ID_DRIVER_OPENSTORECOPY         32802
+#define ID_DRIVER_SHOWSTOREFOLDER       32803
+#define ID_DRIVER_SHOWINFFOLDER         32804
+#define ID_DRIVER_COPY                  32805
+#define ID_DRIVER_COPYPATH              32806
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        224
-#define _APS_NEXT_COMMAND_VALUE         32800
+#define _APS_NEXT_COMMAND_VALUE         32807
 #define _APS_NEXT_CONTROL_VALUE         1000
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

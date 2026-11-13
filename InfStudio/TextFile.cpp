@@ -119,3 +119,30 @@ bool TextFile::FitsAnsi(std::string_view utf8) {
 	WideToMultiByte(CP_ACP, FromUtf8(utf8), &usedDefault);
 	return !usedDefault;
 }
+
+bool TextFile::IsUnder(std::wstring_view path, std::wstring_view folder) {
+	std::error_code ec;
+	auto file = std::filesystem::absolute(path, ec).lexically_normal();
+	auto dir = std::filesystem::absolute(folder, ec).lexically_normal();
+	auto part = file.begin();
+	for (auto const& name : dir) {
+		if (name.empty())
+			continue;		// (a trailing separator)
+		if (part == file.end() || _wcsicmp(part->c_str(), name.c_str()) != 0)
+			return false;
+		++part;
+	}
+	return part != file.end();
+}
+
+bool TextFile::ShouldOpenReadOnly(PCWSTR path) {
+	WCHAR windows[MAX_PATH];
+	if (::GetWindowsDirectory(windows, _countof(windows)) && IsUnder(path, windows))
+		return true;
+	auto attributes = ::GetFileAttributes(path);
+	if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_READONLY))
+		return true;
+	// (opened for writing, not written: nothing changes)
+	wil::unique_hfile file(::CreateFile(path, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr));
+	return !file && ::GetLastError() == ERROR_ACCESS_DENIED;
+}

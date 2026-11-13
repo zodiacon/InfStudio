@@ -171,3 +171,23 @@ TEST_CASE("Saving keeps the file's attributes", "[textfile]") {
 	CHECK(created.Read() == "fresh");
 	CHECK((::GetFileAttributes(created.c_str()) & FILE_ATTRIBUTE_TEMPORARY) == 0);
 }
+
+TEST_CASE("Which files open read-only", "[textfile]") {
+	// a file of one's own
+	TempFile mine(L"mine.inf");
+	mine.Write("x");
+	CHECK_FALSE(TextFile::ShouldOpenReadOnly(mine.c_str()));
+	// marked read-only
+	REQUIRE(::SetFileAttributes(mine.c_str(), FILE_ATTRIBUTE_READONLY));
+	CHECK(TextFile::ShouldOpenReadOnly(mine.c_str()));
+	::SetFileAttributes(mine.c_str(), FILE_ATTRIBUTE_NORMAL);
+	// Windows' (even if it could be written: as an administrator)
+	WCHAR windows[MAX_PATH];
+	REQUIRE(::GetWindowsDirectory(windows, MAX_PATH));
+	auto inf = std::filesystem::path(windows) / L"INF" / L"usbport.inf";
+	CHECK(TextFile::ShouldOpenReadOnly(inf.c_str()));
+	CHECK(TextFile::ShouldOpenReadOnly((std::filesystem::path(windows) / L"System32" / L"DriverStore" / L"x.inf").c_str()));
+	// (a folder whose name only starts like Windows' isn't in it)
+	CHECK_FALSE(TextFile::IsUnder(std::filesystem::path(windows).wstring() + L"Old" + L"/x.inf", windows));
+	CHECK(TextFile::IsUnder(std::filesystem::path(windows).wstring() + L"/INF/x.inf", windows));
+}

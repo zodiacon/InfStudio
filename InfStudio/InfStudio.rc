@@ -66,6 +66,7 @@ BEGIN
             MENUITEM "&UTF-8",                      ID_ENCODING_UTF8
             MENUITEM "UTF-&16",                     ID_ENCODING_UTF16
         END
+        MENUITEM "Read &Only",                  ID_FILE_READONLY
         MENUITEM "&Close",                      ID_FILE_CLOSE
         MENUITEM SEPARATOR
         POPUP "&Recent Files"

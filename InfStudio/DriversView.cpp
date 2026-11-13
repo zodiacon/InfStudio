@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cwctype>
 #include <shlwapi.h>
+#include <shlobj.h>
+#include <ClipboardHelper.h>
 
 #pragma comment(lib, "shlwapi")
 
@@ -40,7 +42,7 @@ void CDriversView::OnActivated(bool active) {
 	// (the commands of a file's tab don't apply here)
 	for (UINT id : { ID_FILE_SAVE, ID_FILE_SAVE_AS, ID_EDIT_COPY, ID_EDIT_CUT, ID_EDIT_PASTE, ID_EDIT_UNDO, ID_EDIT_REDO,
 		ID_EDIT_DELETE, ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL,
-		ID_VIEW_RESULTS, ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE, ID_ENCODING_ANSI, ID_ENCODING_UTF8, ID_ENCODING_UTF16 })
+		ID_VIEW_RESULTS, ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE, ID_ENCODING_ANSI, ID_ENCODING_UTF8, ID_ENCODING_UTF16, ID_FILE_READONLY })
 		UI().UIEnable(id, false);
 	UI().UIEnable(ID_VIEW_REFRESH, true);
 	Frame()->SetStatusText(0, std::format(L"{} driver packages", m_Shown.size()).c_str());
@@ -253,10 +255,76 @@ LRESULT CDriversView::OnColumnClick(int, LPNMHDR hdr, BOOL&) {
 	return 0;
 }
 
-LRESULT CDriversView::OnOpen(int, LPNMHDR, BOOL&) {
+DriverPackage const* CDriversView::Selected() const {
 	auto selected = m_List.GetNextItem(-1, LVNI_SELECTED);
 	if (selected < 0 || selected >= (int)m_Shown.size())
+		return nullptr;
+	return &m_All[m_Shown[selected]];
+}
+
+LRESULT CDriversView::OnOpen(int, LPNMHDR, BOOL&) {
+	if (auto package = Selected())
+		Frame()->OpenFile(package->Path.c_str());
+	return 0;
+}
+
+std::wstring CDriversView::RowText(DriverPackage const& p) {
+	return std::format(L"{}\t{}\t{}\t{}\t{}\t{}\t{}", p.PublishedName, p.OriginalName, p.Provider, p.Class, p.Date, p.Version, p.StorePath);
+}
+
+LRESULT CDriversView::OnContextMenu(UINT, WPARAM wParam, LPARAM lParam, BOOL& bHandled) {
+	if (reinterpret_cast<HWND>(wParam) != m_List.m_hWnd) {
+		bHandled = FALSE;
 		return 0;
-	Frame()->OpenFile(m_All[m_Shown[selected]].Path.c_str());
+	}
+	auto package = Selected();
+	if (!package)
+		return 0;
+
+	CPoint pt(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+	if (lParam == -1) {
+		// from the keyboard: under the selected row
+		CRect rc;
+		m_List.GetItemRect(m_List.GetNextItem(-1, LVNI_SELECTED), &rc, LVIR_LABEL);
+		pt = CPoint(rc.left, rc.bottom);
+		m_List.ClientToScreen(&pt);
+	}
+
+	auto store = package->StorePath.empty() ? MF_GRAYED : 0;
+	CMenu menu;
+	menu.CreatePopupMenu();
+	menu.AppendMenu(MF_STRING, ID_DRIVER_OPEN, L"&Open");
+	menu.AppendMenu(MF_STRING | store, ID_DRIVER_OPENSTORECOPY, L"Open &Driver Store Copy");
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING | store, ID_DRIVER_SHOWSTOREFOLDER, L"Show in Driver &Store Folder");
+	menu.AppendMenu(MF_STRING, ID_DRIVER_SHOWINFFOLDER, L"Show INF in &Folder");
+	menu.AppendMenu(MF_SEPARATOR);
+	menu.AppendMenu(MF_STRING, ID_DRIVER_COPY, L"&Copy Row");
+	menu.AppendMenu(MF_STRING, ID_DRIVER_COPYPATH, L"Copy &Path");
+	menu.SetMenuDefaultItem(ID_DRIVER_OPEN);
+	// (through the frame: its icons; the command comes back here, the frame giving its commands to the active tab)
+	Frame()->TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y);
+	return 0;
+}
+
+LRESULT CDriversView::OnDriverCommand(WORD, WORD wID, HWND, BOOL&) {
+	auto package = Selected();
+	if (!package)
+		return 0;
+	auto showInFolder = [](std::wstring const& path) {
+		// Explorer, the file selected in its folder
+		if (auto pidl = ::ILCreateFromPath(path.c_str())) {
+			::SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
+			::ILFree(pidl);
+		}
+	};
+	switch (wID) {
+		case ID_DRIVER_OPEN: Frame()->OpenFile(package->Path.c_str()); break;
+		case ID_DRIVER_OPENSTORECOPY: Frame()->OpenFile(package->StorePath.c_str()); break;
+		case ID_DRIVER_SHOWSTOREFOLDER: showInFolder(package->StorePath); break;
+		case ID_DRIVER_SHOWINFFOLDER: showInFolder(package->Path); break;
+		case ID_DRIVER_COPY: ClipboardHelper::CopyText(m_hWnd, RowText(*package).c_str()); break;
+		case ID_DRIVER_COPYPATH: ClipboardHelper::CopyText(m_hWnd, package->Path.c_str()); break;
+	}
 	return 0;
 }

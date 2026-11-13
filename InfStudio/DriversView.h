@@ -36,6 +36,8 @@ public:
 		NOTIFY_HANDLER(IDC_LIST, LVN_COLUMNCLICK, OnColumnClick)
 		NOTIFY_HANDLER(IDC_LIST, NM_DBLCLK, OnOpen)
 		NOTIFY_HANDLER(IDC_LIST, NM_RETURN, OnOpen)
+		MESSAGE_HANDLER(WM_CONTEXTMENU, OnContextMenu)
+		COMMAND_RANGE_HANDLER(ID_DRIVER_OPEN, ID_DRIVER_COPYPATH, OnDriverCommand)
 		CHAIN_MSG_MAP(CDpiAware<CDriversView>)
 		CHAIN_MSG_MAP(CViewBase)
 	END_MSG_MAP()
@@ -59,6 +61,14 @@ private:
 	LRESULT OnGetDispInfo(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	LRESULT OnColumnClick(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	LRESULT OnOpen(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	// A package's menu (right-click, or the menu key / Shift+F10 on the selected one): open its INF or its copy in the
+	// driver store, show either in Explorer, copy its row or its path.
+	LRESULT OnContextMenu(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	LRESULT OnDriverCommand(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	// the selected package, or null
+	DriverPackage const* Selected() const;
+	// a row as text: its columns, tab-separated (the store's full path)
+	static std::wstring RowText(DriverPackage const& package);
 
 	// reads the packages on a thread; LoadedMessage brings them
 	void Load();

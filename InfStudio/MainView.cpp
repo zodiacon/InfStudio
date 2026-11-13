@@ -22,6 +22,7 @@ bool CMainView::OpenFile(PCWSTR path) {
 	m_InfView.EmptyUndoBuffer();
 	m_InfView.SetSavePoint();
 	m_InfView.UpdateLineNumberWidth();
+	SetReadOnly(TextFile::ShouldOpenReadOnly(path));
 	m_Path = path;
 	m_Name = m_Path.Mid(m_Path.ReverseFind(L'\\') + 1);
 	BuildTree();
@@ -121,13 +122,17 @@ bool CMainView::OnTreeDoubleClick(HWND, HTREEITEM hItem) {
 
 void CMainView::OnActivated(bool active) {
 	if (active) {
-		UpdateUI();
 		UI().UIEnable(ID_VIEW_REFRESH, true);
 		for (UINT id : { ID_FILE_SAVE_AS, ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS,
 			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE, ID_ENCODING_ANSI, ID_ENCODING_UTF8, ID_ENCODING_UTF16 })
 			UI().UIEnable(id, true);
 		// (each tab has its own results pane)
 		UI().UISetCheck(ID_VIEW_RESULTS, m_EditSplitter.GetSinglePaneMode() == SPLIT_PANE_NONE);
+		UI().UIEnable(ID_FILE_READONLY, true);
+		// (after the above: a read-only file turns some of them off)
+		UpdateUI();
+		// (what another tab said doesn't apply)
+		Frame()->SetStatusText(0, L"Ready");
 	}
 }
 
@@ -155,11 +160,14 @@ void CMainView::UpdateUI() {
 	ui.UIEnable(ID_EDIT_PASTE, m_InfView.CanPaste());
 	ui.UIEnable(ID_EDIT_UNDO, m_InfView.CanUndo());
 	ui.UIEnable(ID_EDIT_REDO, m_InfView.CanRedo());
-	ui.UIEnable(ID_FILE_SAVE, IsDirty());
+	ui.UIEnable(ID_FILE_SAVE, IsDirty() && !m_ReadOnly);
+	ui.UISetCheck(ID_FILE_READONLY, m_ReadOnly);
+	for (UINT id : { ID_EDIT_REPLACE, ID_EDIT_COMPLETE, ID_ENCODING_ANSI, ID_ENCODING_UTF8, ID_ENCODING_UTF16 })
+		ui.UIEnable(id, !m_ReadOnly);
 
 	static constexpr PCWSTR encodings[] = { L"ANSI", L"UTF-8", L"UTF-16" };
 	Frame()->SetStatusText(1, encodings[(int)m_Encoding]);
-	Frame()->SetStatusText(2, IsDirty() ? L"Modified" : L"");
+	Frame()->SetStatusText(2, m_ReadOnly ? L"Read-only" : IsDirty() ? L"Modified" : L"");
 	Frame()->SetStatusText(3, m_ProblemsText.c_str());
 	ui.UISetRadioMenuItem(ID_ENCODING_ANSI + (int)m_Encoding, ID_ENCODING_ANSI, ID_ENCODING_UTF16);
 	Frame()->SetStatusText(4, std::format(L"Line: {} Col: {}",
@@ -316,6 +324,12 @@ LRESULT CMainView::OnSave(WORD, WORD, HWND, BOOL&) {
 
 	if (!IsDirty())
 		return false;
+	if (m_ReadOnly) {
+		// (Ctrl+S comes even while Save is off)
+		Frame()->SetStatusText(0, L"The file is read-only: Save As saves a copy");
+		::MessageBeep(MB_OK);
+		return 0;
+	}
 
 	if (!ConfirmEncoding())
 		return 0;
@@ -489,7 +503,7 @@ LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/
 			Frame()->UpdateTabTitle(m_hWnd, m_Name);
 			// (a new file's tree is analyzed now that it is in a file)
 			BuildTree();
-			UpdateUI();
+			SetReadOnly(TextFile::ShouldOpenReadOnly(m_Path));
 		}
 		else {
 			DisplaySaveError();
@@ -816,4 +830,15 @@ void CMainView::RunChecks(std::string const& text) {
 		m_ProblemsText = std::format(L"{} err, {} warn", errors, warnings);
 	if (IsWindowVisible())
 		Frame()->SetStatusText(3, m_ProblemsText.c_str());
+}
+
+void CMainView::SetReadOnly(bool readOnly) {
+	m_ReadOnly = readOnly;
+	m_InfView.Execute(SCI_SETREADONLY, readOnly);
+	UpdateUI();
+}
+
+LRESULT CMainView::OnToggleReadOnly(WORD, WORD, HWND, BOOL&) {
+	SetReadOnly(!m_ReadOnly);
+	return 0;
 }

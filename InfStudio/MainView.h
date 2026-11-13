@@ -44,6 +44,7 @@ public:
 		NOTIFY_CODE_HANDLER(SCN_AUTOCCOMPLETED, OnAutoCompleted)
 		COMMAND_ID_HANDLER(ID_EDIT_COMPLETE, OnComplete)
 		COMMAND_RANGE_HANDLER(ID_ENCODING_ANSI, ID_ENCODING_UTF16, OnEncoding)
+		COMMAND_ID_HANDLER(ID_FILE_READONLY, OnToggleReadOnly)
 		NOTIFY_CODE_HANDLER(SCN_DWELLEND, OnDwellEnd)
 		COMMAND_ID_HANDLER(ID_EDIT_GOTO_DEFINITION, OnGoToDefinition)
 		COMMAND_ID_HANDLER(ID_EDIT_GO_BACK, OnGoBack)
@@ -182,6 +183,11 @@ private:
 	LRESULT OnComplete(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	// File > Encoding: what the file is saved as (TextEncoding's order); a change is unsaved until the next save
 	LRESULT OnEncoding(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	// Read-only (a file of Windows', or one that can't be written: TextFile::ShouldOpenReadOnly; File > Read Only turns it
+	// off or on): the editor takes no edits and Save is off; Save As saves a copy, which is the view's file then.
+	void SetReadOnly(bool readOnly);
+	LRESULT OnToggleReadOnly(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	bool m_ReadOnly{ false };
 	std::string m_CompletionSuffix;
 
 	// The built-in checks (InfChecks) of the editor's text, run with the tree's analysis: squiggles, their messages when

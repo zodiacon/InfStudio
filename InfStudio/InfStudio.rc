@@ -189,9 +189,9 @@ CAPTION "About INF Studio"
 FONT 9, "Segoe UI", 0, 0, 0x0
 BEGIN
     DEFPUSHBUTTON   "OK",IDOK,61,52,40,14
-    CTEXT           "INF Studio v0.2",IDC_STATIC,43,15,79,24
+    CTEXT           "INF Studio v1.0.0",IDC_STATIC,42,15,79,24
     ICON            IDR_MAINFRAME,IDC_STATIC,7,7,20,20
-    LTEXT           "©2022 Pavel Yosifovich",IDC_STATIC,42,27,97,13
+    LTEXT           "©2022-2026 Pavel Yosifovich",IDC_STATIC,32,27,97,13
 END
 
 IDD_TEMPLATE DIALOGEX 0, 0, 520, 300
@@ -278,8 +278,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,2,0,0
- PRODUCTVERSION 0,2,0,0
+ FILEVERSION 1,0,0
+ PRODUCTVERSION 1,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -296,12 +296,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Scorpio Software"
             VALUE "FileDescription", "INF Studio - View/Edit INF Files"
-            VALUE "FileVersion", "0.2.0.0"
+            VALUE "FileVersion", "1.0.0"
             VALUE "InternalName", "InfStudio"
-            VALUE "LegalCopyright", "©2022 Pavel Yosifovich"
+            VALUE "LegalCopyright", "©2022-2026 Pavel Yosifovich"
             VALUE "OriginalFilename", "InfStudio.exe"
             VALUE "ProductName", "INF Studio"
-            VALUE "ProductVersion", "0.2.0.0"
+            VALUE "ProductVersion", "1.0.0"
         END
     END
     BLOCK "VarFileInfo"

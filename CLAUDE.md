@@ -19,7 +19,21 @@ msbuild InfStudio.sln /p:Configuration=Release /p:Platform=x64 /m
 - Dependencies come from vcpkg's user-wide integration (no manifest in the repo). `InfStudio.vcxproj` sets `VcpkgUseStatic`, so it takes the `x64-windows-static` triplet: `scintilla`, `lexilla` (both only installed static), plus `detours` and `wil` that WTLHelper uses. Static Scintilla needs `imm32` (linked by a `#pragma comment` in `InfStudio.cpp`).
 - WTL comes from the headers vendored in `WTLHelper\WTL` (on the include path). Nothing uses NuGet anymore.
 - `WTLHelper` is a git submodule (`git submodule update --init`). It is the author's shared library with its own repo and its own `CLAUDE.md`, so changes there are a commit inside the submodule and affect other apps.
-- There is no test project. `DumpInf` is a console app that prints an INF's version info and sections through `InfCore` (no argument: the master INF), for checking `InfFile` without the GUI. The GUI accepts INF paths on its command line, which makes it easy to launch on a file.
+- `DumpInf` is a console app that prints an INF's version info and sections through `InfCore` (no argument: the master INF). The GUI accepts INF paths on its command line, which makes it easy to launch on a file.
+
+### Tests
+
+`InfStudio.Tests` is a Catch2 v3 console project (x64, Debug and Release). Catch2 comes from vcpkg's static triplet with auto-linking off, so the project lists the libraries it links (Catch2 and Lexilla). It compiles `InfLexer.cpp` and `TextFile.cpp` from `InfStudio/` directly and links `InfCore`. Build the solution, then run:
+
+```
+x64\Debug\InfStudio.Tests.exe              # all tests; exit code 0 when everything passes
+x64\Debug\InfStudio.Tests.exe [lexer]      # by tag: [lexer], [scintilla], [textfile], [inffile]
+x64\Debug\InfStudio.Tests.exe "Strings"    # one test case by name
+```
+
+- `InfLexerTests.cpp` checks `InfLexer::StyleLine` with one letter per byte (`.` default, `c` comment, `S` section, `k` key, `o` operator, `s` string, `t` string key, `n` number), so an expected value lines up under its line. The `[scintilla]` tests run the real lexer (`InfLexer::Create`) over a `FakeDocument` (an `IDocument` on a string). They cover what only the Scintilla side does: line ends, the continuation in the line state, lexing from the middle of a document.
+- `TextFileTests.cpp` and `InfFileTests.cpp` work on files in the temporary directory (`TempFile` in `TestCommon.h`). `InfFile` is tested through the real SetupAPI. Expectations that depend on the ANSI code page run only under code page 1252.
+- Keep the test sources ASCII (use `\u` escapes): they have no BOM, so MSVC reads them in the ANSI code page.
 
 ## Architecture
 

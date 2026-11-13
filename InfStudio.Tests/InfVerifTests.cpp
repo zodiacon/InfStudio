@@ -76,3 +76,26 @@ TEST_CASE("Running InfVerif", "[infverif]") {
 	CHECK(has(1233, 1));		// no CatalogFile
 	CHECK(has(1235, 10));		// %Dev% not in [Strings]
 }
+
+TEST_CASE("Running InfVerif can be stopped", "[infverif]") {
+	auto infverif = InfVerif::Find();
+	if (infverif.empty())
+		SKIP("the WDK's infverif.exe isn't installed");
+
+	TempFile file(L"stopped.inf");
+	file.Write("[Version]\r\nSignature = \"$Windows NT$\"\r\n");
+	std::stop_source stop;
+	stop.request_stop();
+	auto start = ::GetTickCount64();
+	auto result = InfVerif::Run(infverif, L"/w", file.Path(), stop.get_token());
+	// ended at once, its process killed
+	CHECK(::GetTickCount64() - start < 1000);
+	CHECK(result.Ran);
+	CHECK(result.Cancelled);
+	CHECK(result.Messages.empty());
+
+	// not stopped: the whole run
+	auto whole = InfVerif::Run(infverif, L"/w", file.Path());
+	CHECK_FALSE(whole.Cancelled);
+	CHECK_FALSE(whole.Messages.empty());
+}

@@ -146,3 +146,11 @@ bool TextFile::ShouldOpenReadOnly(PCWSTR path) {
 	wil::unique_hfile file(::CreateFile(path, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr));
 	return !file && ::GetLastError() == ERROR_ACCESS_DENIED;
 }
+
+std::optional<FileStamp> TextFile::Stamp(PCWSTR path) {
+	WIN32_FILE_ATTRIBUTE_DATA data;
+	if (!::GetFileAttributesEx(path, GetFileExInfoStandard, &data))
+		return {};
+	return FileStamp{ (ULONGLONG(data.ftLastWriteTime.dwHighDateTime) << 32) | data.ftLastWriteTime.dwLowDateTime,
+		(ULONGLONG(data.nFileSizeHigh) << 32) | data.nFileSizeLow };
+}

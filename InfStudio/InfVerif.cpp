@@ -35,7 +35,7 @@ std::filesystem::path InfVerif::Find() {
 	return found;
 }
 
-InfVerifResult InfVerif::Run(std::filesystem::path const& infverif, PCWSTR mode, std::filesystem::path const& inf) {
+InfVerifResult InfVerif::Run(std::filesystem::path const& infverif, PCWSTR mode, std::filesystem::path const& inf, std::stop_token stop) {
 	InfVerifResult result;
 
 	SECURITY_ATTRIBUTES sa{ sizeof(sa), nullptr, TRUE };
@@ -55,6 +55,8 @@ InfVerifResult InfVerif::Run(std::filesystem::path const& infverif, PCWSTR mode,
 	wil::unique_handle process(pi.hProcess), thread(pi.hThread);
 	// (the child has its copy: the pipe ends when it does)
 	write.reset();
+	// stopped: the process killed, which ends its output (and the reading below)
+	std::stop_callback cancel(stop, [hProcess = process.get()] { ::TerminateProcess(hProcess, ERROR_CANCELLED); });
 
 	char buffer[4096];
 	DWORD bytes;
@@ -63,7 +65,9 @@ InfVerifResult InfVerif::Run(std::filesystem::path const& infverif, PCWSTR mode,
 	::WaitForSingleObject(process.get(), INFINITE);
 	::GetExitCodeProcess(process.get(), &result.ExitCode);
 	result.Ran = true;
-	result.Messages = Parse(result.Output);
+	result.Cancelled = stop.stop_requested();
+	if (!result.Cancelled)
+		result.Messages = Parse(result.Output);
 	return result;
 }
 

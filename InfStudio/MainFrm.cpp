@@ -452,6 +452,15 @@ LRESULT CMainFrame::OnDpiChanged(UINT, WPARAM, LPARAM lParam, BOOL&) {
 	return 0;
 }
 
+LRESULT CMainFrame::OnActivateApp(UINT, WPARAM wParam, LPARAM, BOOL& bHandled) {
+	if (wParam)
+		if (auto page = m_view.GetActivePage(); page >= 0)
+			if (auto view = ViewOfPage(page))
+				view->CheckFileChanged();
+	bHandled = FALSE;
+	return 0;
+}
+
 LRESULT CMainFrame::OnDpiChangedPosted(UINT, WPARAM, LPARAM, BOOL&) {
 	// the buttons' images at the DPI, the buttons measured again from them, and the rebar band fitted to them
 	ToolbarHelper::UpdateToolBarImages(m_ToolBar, ToolBarButtons, _countof(ToolBarButtons));

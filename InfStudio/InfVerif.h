@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 #include <filesystem>
+#include <stop_token>
 
 //
 // The WDK's INF verifier (infverif.exe): finding it, running it on a file, and reading what it reports.
@@ -18,6 +19,7 @@ struct InfVerifMessage {
 
 struct InfVerifResult {
 	bool Ran{ false };		// false if infverif.exe couldn't be started
+	bool Cancelled{ false };	// stopped before it was done (its process killed)
 	DWORD ExitCode{ 0 };
 	std::string Output;
 	std::vector<InfVerifMessage> Messages;
@@ -27,7 +29,8 @@ namespace InfVerif {
 	// the newest WDK's infverif.exe for this machine's architecture, or empty
 	std::filesystem::path Find();
 	// mode: "/w" (Windows Driver requirements), "/h" (WHQL), "/u" (Universal)...
-	InfVerifResult Run(std::filesystem::path const& infverif, PCWSTR mode, std::filesystem::path const& inf);
+	// stop: kills infverif.exe, and the run returns at once
+	InfVerifResult Run(std::filesystem::path const& infverif, PCWSTR mode, std::filesystem::path const& inf, std::stop_token stop = {});
 	// the "ERROR(1233) in <path>, line 12: <text>" lines of its output (and WARNING, INFO)
 	std::vector<InfVerifMessage> Parse(std::string_view output);
 }

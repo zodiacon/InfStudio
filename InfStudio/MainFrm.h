@@ -28,6 +28,7 @@ public:
 		MESSAGE_HANDLER(WM_CLOSE, OnClose)
 		MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
 		MESSAGE_HANDLER(WM_DPICHANGED, OnDpiChanged)
+		MESSAGE_HANDLER(WM_ACTIVATEAPP, OnActivateApp)
 		MESSAGE_HANDLER(CDpiAware<CMainFrame>::DpiChangedMessage, OnDpiChangedPosted)
 		COMMAND_ID_HANDLER(ID_APP_EXIT, OnFileExit)
 		COMMAND_ID_HANDLER(ID_FILE_NEW, OnFileNew)
@@ -69,6 +70,8 @@ private:
 	// it has handled the change itself, which comes after (OnDpiChangedPosted). The views follow on their own (CDpiAware).
 	LRESULT OnDpiChanged(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	LRESULT OnDpiChangedPosted(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	// back from another program: the active tab's file may have changed on disk
+	LRESULT OnActivateApp(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	void ApplyDpi();
 	// the status bar's panes: the messages (stretched), then what the active tab tells (IMainFrame::SetStatusText's index)
 	enum StatusPane { PaneEncoding = 1, PaneModified, PaneProblems, PanePosition };

@@ -22,4 +22,6 @@ struct IView {
 	virtual void FontChanged() {}
 	// Options > Live Analysis was turned on or off (in the settings)
 	virtual void LiveAnalysisChanged() {}
+	// the app is active again: the file the tab shows may have changed on disk
+	virtual void CheckFileChanged() {}
 };

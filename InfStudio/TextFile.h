@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <optional>
 
 // How an INF file's text is stored. The editor always holds UTF-8; this is what the file is converted from and back to.
 enum class TextEncoding {
@@ -10,7 +11,16 @@ enum class TextEncoding {
 	Utf16,		// UTF-16 LE with a BOM
 };
 
+// when a file was last written, and its size: what tells that it changed (on disk, by another program)
+struct FileStamp {
+	ULONGLONG LastWrite;
+	ULONGLONG Size;
+	bool operator==(FileStamp const&) const = default;
+};
+
 struct TextFile {
+	// the file's stamp; none if it isn't there
+	static std::optional<FileStamp> Stamp(PCWSTR path);
 	// the file's text as UTF-8, and how it was stored
 	static bool Load(PCWSTR path, std::string& utf8, TextEncoding& encoding);
 	// writes the text (UTF-8) as encoding, replacing the whole file

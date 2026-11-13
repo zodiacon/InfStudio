@@ -18,6 +18,7 @@
 #include "..\InfCore\InfAnalysis.h"
 #include <set>
 #include <filesystem>
+#include <thread>
 
 class CMainView : 
 	public CViewBase<CMainView>,
@@ -34,6 +35,8 @@ public:
 	void OnActivated(bool active);
 	bool CanClose() override;
 	void FontChanged() override;
+	void CheckFileChanged() override;
+	~CMainView();
 	void LiveAnalysisChanged() override;
 
 	BEGIN_MSG_MAP(CMainView)
@@ -49,6 +52,8 @@ public:
 		COMMAND_ID_HANDLER(ID_EDIT_GOTO_DEFINITION, OnGoToDefinition)
 		COMMAND_ID_HANDLER(ID_EDIT_GO_BACK, OnGoBack)
 		MESSAGE_HANDLER(WM_TIMER, OnTimer)
+		MESSAGE_HANDLER(ValidatedMessage, OnValidated)
+		MESSAGE_HANDLER(CheckFileMessage, OnCheckFile)
 		NOTIFY_CODE_HANDLER(TVN_KEYDOWN, OnTreeKeyDown)
 		COMMAND_ID_HANDLER(ID_EDIT_FIND, OnEditFind)
 		COMMAND_ID_HANDLER(ID_EDIT_REPLACE, OnEditReplace)
@@ -130,8 +135,9 @@ private:
 	std::vector<std::wstring> TreePath(HTREEITEM hItem) const;
 	void SaveTreeState(HTREEITEM hItem, TreeState& state) const;
 	void RestoreTreeState(HTREEITEM hItem, TreeState const& state);
-	// the editor's text in a file of its own (the view's name, in a temporary folder of the view), for SetupAPI and InfVerif
-	std::filesystem::path WriteTempCopy();
+	// The editor's text in a file of its own (by the view's name, in a temporary folder of the view, one for each purpose:
+	// the analysis deleting its copy mustn't take the one InfVerif is reading), for SetupAPI and InfVerif.
+	std::filesystem::path WriteTempCopy(std::wstring const& purpose);
 	static void DeleteTempCopy(std::filesystem::path const& file);
 	static constexpr UINT_PTR AnalysisTimer = 1;
 	static constexpr UINT AnalysisDelay = 500;
@@ -158,7 +164,21 @@ private:
 
 	// INF > Validate (/w) and Validate for WHQL (/h): InfVerif on the editor's text, its problems in the pane under it
 	LRESULT OnValidate(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	// InfVerif runs on a thread (m_Validator): the results come in ValidatedMessage. Validating again (or the view going)
+	// stops a run still going (its process killed); the results of one that isn't the latest (m_ValidationGeneration) are dropped.
 	void Validate(PCWSTR mode);
+	struct ValidationDone {
+		UINT Generation;
+		std::wstring Mode;
+		InfVerifResult Result;
+		size_t TextVersion;		// m_TextVersion when it started
+		std::wstring Copy;		// the temporary copy InfVerif read (its messages name it)
+	};
+	static constexpr UINT ValidatedMessage = WM_APP + 10;
+	LRESULT OnValidated(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	void ShowRunning(PCWSTR mode);
+	// the results aren't of the text there now: a row first that says so (once)
+	void MarkResultsStale();
 	void ShowResults(std::vector<InfVerifMessage> messages, PCWSTR mode);
 	void ShowResultsPane(bool show);
 	LRESULT OnViewResults(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
@@ -216,6 +236,18 @@ private:
 	CCustomHorSplitterWindow m_EditSplitter;
 	CListViewCtrl m_Results;
 	std::vector<InfVerifMessage> m_Messages;
+	std::jthread m_Validator;
+	UINT m_ValidationGeneration{ 0 };
+	size_t m_TextVersion{ 0 };			// counts the edits
+	bool m_ResultsShown{ false }, m_ResultsStale{ false };
+
+	// The file changed on disk (by another program; seen when the app or the tab is active again: CheckFileMessage): an
+	// unmodified file is reloaded, a modified one only if the user says so; a file that's gone is told of.
+	static constexpr UINT CheckFileMessage = WM_APP + 11;
+	LRESULT OnCheckFile(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	void Reload();
+	std::optional<FileStamp> m_Stamp;	// the file as it was opened or saved
+	bool m_CheckingFile{ false }, m_FileGone{ false };
 	CInfView m_InfView;
 	CString m_Path;
 	CString m_Name;

@@ -23,6 +23,7 @@ bool CMainView::OpenFile(PCWSTR path) {
 	m_InfView.SetSavePoint();
 	m_InfView.UpdateLineNumberWidth();
 	SetReadOnly(TextFile::ShouldOpenReadOnly(path));
+	m_Stamp = TextFile::Stamp(path);
 	m_Path = path;
 	m_Name = m_Path.Mid(m_Path.ReverseFind(L'\\') + 1);
 	BuildTree();
@@ -133,6 +134,7 @@ void CMainView::OnActivated(bool active) {
 		UpdateUI();
 		// (what another tab said doesn't apply)
 		Frame()->SetStatusText(0, L"Ready");
+		CheckFileChanged();
 	}
 }
 
@@ -195,16 +197,19 @@ bool CMainView::DoSave(PCWSTR path) {
 
 	m_InfView.SetSavePoint();
 	m_Unsaved = false;
+	// (what's on disk now is what this wrote)
+	m_Stamp = TextFile::Stamp(path);
+	m_FileGone = false;
 	return true;
 }
 
-std::filesystem::path CMainView::WriteTempCopy() {
+std::filesystem::path CMainView::WriteTempCopy(std::wstring const& purpose) {
 	// An ANSI file with characters the code page lacks goes as UTF-16, so that they get there.
 	auto text = m_InfView.GetText(m_InfView.Length());
 	auto encoding = m_Encoding == TextEncoding::Ansi && !TextFile::FitsAnsi(text) ? TextEncoding::Utf16 : m_Encoding;
 	std::error_code ec;
 	// (a folder for each view, as two may have files of the same name)
-	auto dir = std::filesystem::temp_directory_path(ec) / std::format(L"InfStudio-{}", ::GetCurrentProcessId()) / std::format(L"{}", (void*)this);
+	auto dir = std::filesystem::temp_directory_path(ec) / std::format(L"InfStudio-{}", ::GetCurrentProcessId()) / std::format(L"{}", (void*)this) / purpose;
 	std::filesystem::create_directories(dir, ec);
 	auto file = dir / (m_Name.IsEmpty() ? L"Untitled.inf" : (PCWSTR)m_Name);
 	if (!TextFile::Save(file.c_str(), text, encoding))
@@ -277,7 +282,7 @@ void CMainView::BuildTree() {
 
 	// the editor's text, saved or not
 	RunChecks(m_InfView.GetText(m_InfView.Length()));
-	if (auto file = WriteTempCopy(); !file.empty()) {
+	if (auto file = WriteTempCopy(L"analysis"); !file.empty()) {
 		InfFile inf;
 		UINT errorLine = 0;
 		if (inf.Open(file.c_str(), nullptr, &errorLine))
@@ -523,6 +528,8 @@ LRESULT CMainView::OnRefresh(WORD, WORD, HWND, BOOL&) {
 LRESULT CMainView::OnTextModified(int, LPNMHDR hdr, BOOL& bHandled) {
 	auto scn = reinterpret_cast<SCNotification*>(hdr);
 	if (scn->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) {
+		m_TextVersion++;
+		MarkResultsStale();
 		// the tree again once typing pauses (Options > Live Analysis)
 		if (AppSettings::Get().LiveAnalysis())
 			SetTimer(AnalysisTimer, AnalysisDelay);
@@ -556,30 +563,70 @@ void CMainView::Validate(PCWSTR mode) {
 		return;
 	}
 
+	auto generation = ++m_ValidationGeneration;
+	// (a run still going is stopped: its process killed)
+	m_Validator = {};
 	// The editor's text, saved or not, goes to a file of its own by the same name (InfVerif checks the name too).
-	auto file = WriteTempCopy();
+	auto file = WriteTempCopy(std::format(L"validation-{}", generation));
 	if (file.empty()) {
 		AtlMessageBox(m_hWnd, L"Failed to write the file for InfVerif.", IDS_TITLE, MB_ICONERROR);
 		return;
 	}
+	ShowRunning(mode);
+	m_Validator = std::jthread([hWnd = m_hWnd, infverif, mode = std::wstring(mode), file, generation, version = m_TextVersion](std::stop_token stop) {
+		auto done = std::make_unique<ValidationDone>(ValidationDone{ generation, mode, InfVerif::Run(infverif, mode.c_str(), file, stop), version, file.wstring() });
+		DeleteTempCopy(file);
+		// (the view takes them; if it's gone, or they're not wanted, nobody does)
+		if (!stop.stop_requested() && ::PostMessage(hWnd, ValidatedMessage, 0, reinterpret_cast<LPARAM>(done.get())))
+			done.release();
+	});
+}
 
-	InfVerifResult result;
-	{
-		CWaitCursor wait;
-		Frame()->SetStatusText(0, L"Running InfVerif...");
-		result = InfVerif::Run(infverif, mode, file);
-	}
-	DeleteTempCopy(file);
-	if (!result.Ran) {
+void CMainView::ShowRunning(PCWSTR mode) {
+	m_Messages.clear();
+	m_ResultsShown = m_ResultsStale = false;
+	m_Results.DeleteAllItems();
+	auto n = m_Results.InsertItem(0, L"", (int)InfVerifMessage::Severity::Info);
+	m_Results.SetItemText(n, 2, std::format(L"Running InfVerif {}...", mode).c_str());
+	m_Results.SetItemData(n, (DWORD_PTR)-1);
+	ShowResultsPane(true);
+	Frame()->SetStatusText(0, std::format(L"Running InfVerif {}...", mode).c_str());
+}
+
+LRESULT CMainView::OnValidated(UINT, WPARAM, LPARAM lParam, BOOL&) {
+	std::unique_ptr<ValidationDone> done(reinterpret_cast<ValidationDone*>(lParam));
+	if (done->Generation != m_ValidationGeneration || done->Result.Cancelled)
+		return 0;
+	if (!done->Result.Ran) {
+		m_Results.DeleteAllItems();
 		Frame()->SetStatusText(0, L"");
-		AtlMessageBox(m_hWnd, std::format(L"Failed to run {}.", infverif.wstring()).c_str(), IDS_TITLE, MB_ICONERROR);
-		return;
+		AtlMessageBox(m_hWnd, L"Failed to run InfVerif.", IDS_TITLE, MB_ICONERROR);
+		return 0;
 	}
-	ShowResults(std::move(result.Messages), mode);
+	// the messages name the temporary copy: the file's name instead
+	for (auto& m : done->Result.Messages)
+		for (size_t pos; (pos = m.Text.find(done->Copy)) != std::wstring::npos;)
+			m.Text.replace(pos, done->Copy.size(), (PCWSTR)m_Name);
+	ShowResults(std::move(done->Result.Messages), done->Mode.c_str());
+	// edited while it ran
+	if (m_TextVersion != done->TextVersion)
+		MarkResultsStale();
+	return 0;
+}
+
+void CMainView::MarkResultsStale() {
+	if (!m_ResultsShown || m_ResultsStale)
+		return;
+	m_ResultsStale = true;
+	auto n = m_Results.InsertItem(0, L"", (int)InfVerifMessage::Severity::Info);
+	m_Results.SetItemText(n, 2, L"The text changed since this validation: validate again (F7) for what's there now");
+	m_Results.SetItemData(n, (DWORD_PTR)-1);
 }
 
 void CMainView::ShowResults(std::vector<InfVerifMessage> messages, PCWSTR mode) {
 	m_Messages = std::move(messages);
+	m_ResultsShown = true;
+	m_ResultsStale = false;
 	m_Results.SetRedraw(FALSE);
 	m_Results.DeleteAllItems();
 	int errors = 0, warnings = 0;
@@ -841,4 +888,71 @@ void CMainView::SetReadOnly(bool readOnly) {
 LRESULT CMainView::OnToggleReadOnly(WORD, WORD, HWND, BOOL&) {
 	SetReadOnly(!m_ReadOnly);
 	return 0;
+}
+
+CMainView::~CMainView() {
+	// (a validation still going is stopped first: it writes in the folder)
+	m_Validator = {};
+	std::error_code ec;
+	std::filesystem::remove_all(std::filesystem::temp_directory_path(ec) / std::format(L"InfStudio-{}", ::GetCurrentProcessId()) / std::format(L"{}", (void*)this), ec);
+}
+
+void CMainView::CheckFileChanged() {
+	// (posted: not while the app's activation or a tab switch is being handled, which a message box would get in the middle of)
+	PostMessage(CheckFileMessage);
+}
+
+LRESULT CMainView::OnCheckFile(UINT, WPARAM, LPARAM, BOOL&) {
+	if (m_Path.IsEmpty() || !m_Stamp || m_CheckingFile)
+		return 0;
+	auto stamp = TextFile::Stamp(m_Path);
+	if (!stamp) {
+		if (!m_FileGone) {
+			m_FileGone = true;
+			Frame()->SetStatusText(0, L"The file isn't there anymore (deleted or moved): Save writes it again");
+		}
+		return 0;
+	}
+	m_FileGone = false;
+	if (*stamp == *m_Stamp)
+		return 0;
+
+	m_CheckingFile = true;
+	bool reload = !IsDirty() || AtlMessageBox(m_hWnd,
+		std::format(L"{} changed on disk (another program wrote it).\n\nReload it? Your changes here would be lost.", (PCWSTR)m_Name).c_str(),
+		IDS_TITLE, MB_YESNO | MB_ICONQUESTION) == IDYES;
+	if (reload)
+		Reload();
+	else
+		m_Stamp = stamp;	// (asked once for this change)
+	m_CheckingFile = false;
+	return 0;
+}
+
+void CMainView::Reload() {
+	std::string text;
+	TextEncoding encoding;
+	if (!TextFile::Load(m_Path, text, encoding)) {
+		AtlMessageBox(m_hWnd, L"Failed to read the file again.", IDS_TITLE, MB_ICONERROR);
+		return;
+	}
+	// where the caret and the view were, to be there again
+	auto firstLine = m_InfView.Execute(SCI_GETFIRSTVISIBLELINE);
+	auto caretLine = m_InfView.Execute(SCI_LINEFROMPOSITION, m_InfView.Execute(SCI_GETCURRENTPOS));
+
+	// (a read-only editor takes no text)
+	m_InfView.Execute(SCI_SETREADONLY, FALSE);
+	m_Encoding = encoding;
+	m_InfView.SetText(text.c_str());
+	m_InfView.EmptyUndoBuffer();
+	m_InfView.SetSavePoint();
+	m_Unsaved = false;
+	m_InfView.Execute(SCI_SETREADONLY, m_ReadOnly);
+	m_InfView.UpdateLineNumberWidth();
+	m_InfView.Execute(SCI_GOTOLINE, std::min(caretLine, m_InfView.Execute(SCI_GETLINECOUNT) - 1));
+	m_InfView.Execute(SCI_SETFIRSTVISIBLELINE, firstLine);
+	m_Stamp = TextFile::Stamp(m_Path);
+	BuildTree();
+	UpdateUI();
+	Frame()->SetStatusText(0, L"Reloaded: the file changed on disk");
 }

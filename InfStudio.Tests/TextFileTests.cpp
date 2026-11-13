@@ -191,3 +191,29 @@ TEST_CASE("Which files open read-only", "[textfile]") {
 	CHECK_FALSE(TextFile::IsUnder(std::filesystem::path(windows).wstring() + L"Old" + L"/x.inf", windows));
 	CHECK(TextFile::IsUnder(std::filesystem::path(windows).wstring() + L"/INF/x.inf", windows));
 }
+
+TEST_CASE("A file's stamp tells whether it changed", "[textfile]") {
+	TempFile file(L"stamped.inf");
+	file.Write("one");
+	auto before = TextFile::Stamp(file.c_str());
+	REQUIRE(before);
+	CHECK(TextFile::Stamp(file.c_str()) == before);
+
+	// other contents (another size)
+	file.Write("other contents");
+	auto after = TextFile::Stamp(file.c_str());
+	REQUIRE(after);
+	CHECK(after != before);
+
+	// the same size, another time
+	wil::unique_hfile handle(::CreateFile(file.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr));
+	REQUIRE(handle);
+	FILETIME time{ 0x12345678, 0x01D00000 };
+	REQUIRE(::SetFileTime(handle.get(), nullptr, nullptr, &time));
+	handle.reset();
+	CHECK(TextFile::Stamp(file.c_str()) != after);
+
+	// not there
+	TempFile missing(L"no-stamp.inf");
+	CHECK_FALSE(TextFile::Stamp(missing.c_str()));
+}

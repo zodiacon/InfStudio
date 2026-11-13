@@ -5,8 +5,9 @@
 #pragma once
 
 #include "ScintillaCtrl.h"
+#include <WTLHelper.h>
 
-class CInfView : 
+class CInfView :
 	public CWindowImpl<CInfView, CScintillaCtrl>,
 	public CScintillaCommands<CInfView> {
 public:
@@ -15,10 +16,18 @@ public:
 	BEGIN_MSG_MAP(CInfView)
 		MESSAGE_HANDLER(WM_SETFOCUS, OnSetFocus)
 		MESSAGE_HANDLER(WM_CREATE, OnCreate)
+		MESSAGE_HANDLER(WTLHelper::ThemeChangedMessage, OnThemeChanged)
 		CHAIN_MSG_MAP_ALT(CScintillaCommands<CInfView>, 1)
 	END_MSG_MAP()
 
+	// the line number margin wide enough for the document's line count (at least 4 digits)
+	void UpdateLineNumberWidth();
+
 private:
+	// the editor's colors for the current mode (light or dark); Scintilla draws itself, so dark mode doesn't reach it
+	void ApplyColors();
+	LRESULT OnThemeChanged(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+
 	// Handler prototypes (uncomment arguments if needed):
 	//	LRESULT MessageHandler(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)
 	//	LRESULT CommandHandler(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)

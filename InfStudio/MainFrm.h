@@ -5,8 +5,7 @@
 #pragma once
 
 #include "Interfaces.h"
-#include <CustomTabView.h>
-#include "OwnerDrawnMenu.h"
+#include <NativeCustomTabView.h>
 #include "AppSettings.h"
 #include "RecentFilesManager.h"
 
@@ -15,7 +14,6 @@ class CMainFrame :
 	public CAutoUpdateUI<CMainFrame>,
 	public CMessageFilter,
 	public IMainFrame,
-	public COwnerDrawnMenu<CMainFrame>,
 	public CIdleHandler {
 public:
 	DECLARE_FRAME_WND_CLASS(L"InfStudioMainWndClass", IDR_MAINFRAME)
@@ -26,11 +24,13 @@ public:
 	BEGIN_MSG_MAP(CMainFrame)
 		NOTIFY_CODE_HANDLER(TBVN_PAGEACTIVATED, OnPageActivated)
 		MESSAGE_HANDLER(WM_CREATE, OnCreate)
+		MESSAGE_HANDLER(WM_CLOSE, OnClose)
 		MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
 		COMMAND_ID_HANDLER(ID_APP_EXIT, OnFileExit)
 		COMMAND_ID_HANDLER(ID_FILE_NEW, OnFileNew)
 		COMMAND_ID_HANDLER(ID_FILE_OPEN, OnFileOpen)
 		COMMAND_ID_HANDLER(ID_OPTIONS_ALWAYSONTOP, OnAlwaysOnTop)
+		COMMAND_ID_HANDLER(ID_OPTIONS_DARKMODE, OnToggleDarkMode)
 		COMMAND_ID_HANDLER(ID_VIEW_STATUS_BAR, OnViewStatusBar)
 		COMMAND_ID_HANDLER(ID_APP_ABOUT, OnAppAbout)
 		COMMAND_ID_HANDLER(ID_WINDOW_CLOSE, OnWindowClose)
@@ -46,17 +46,19 @@ public:
 			return TRUE;
 		}
 		CHAIN_MSG_MAP(CAutoUpdateUI<CMainFrame>)
-		CHAIN_MSG_MAP(COwnerDrawnMenu<CMainFrame>)
 		CHAIN_MSG_MAP(CFrameWindowImpl<CMainFrame>)
 		REFLECT_NOTIFICATIONS_EX()
 	END_MSG_MAP()
 
 private:
 	void UpdateUI();
-	void InitMenu();
+	void InitMenu(HMENU menu);
 	void SetAlwaysOnTop();
 	void UpdateRecentFilesMenu();
 	bool DoFileOpen(PCWSTR path, PCWSTR name = nullptr);
+	IView* ViewOfPage(int page) const;
+	// asks every tab whether it can close (each may ask to save its file); false if the user cancelled
+	bool CanCloseAll();
 
 	// IMainFrame
 	HWND GetHwnd() const override;
@@ -73,6 +75,7 @@ private:
 	//	LRESULT NotifyHandler(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/)
 
 	LRESULT OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	LRESULT OnClose(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& bHandled);
 	LRESULT OnDestroy(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& bHandled);
 	LRESULT OnFileExit(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnFileNew(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
@@ -80,6 +83,7 @@ private:
 	LRESULT OnViewStatusBar(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnAppAbout(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnAlwaysOnTop(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnToggleDarkMode(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnWindowClose(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnWindowCloseAll(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnWindowActivate(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
@@ -88,10 +92,9 @@ private:
 	LRESULT OnRecentFile(WORD, WORD id, HWND, BOOL&);
 	LRESULT OnDropFiles(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 
-	CCustomTabView m_view;
+	CNativeCustomTabView m_view;
 	CIcon m_InfIcon;
 	CMultiPaneStatusBarCtrl m_StatusBar;
 	int m_CurrentPage{ -1 };
-	inline static AppSettings s_Settings;
 	inline static RecentFilesManager s_recentFiles;
 };

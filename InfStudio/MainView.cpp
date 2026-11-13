@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "MainView.h"
 #include "resource.h"
-#include <ThemeHelper.h>
+#include <WTLHelper.h>
 
 BOOL CMainView::PreTranslateMessage(MSG* pMsg) {
 	if (m_fr && m_fr->IsDialogMessage(pMsg))
@@ -41,6 +41,7 @@ bool CMainView::OpenFile(PCWSTR path) {
 				m_InfView.SetText(buffer.get());
 			}
 			m_InfView.SetSavePoint();
+			m_InfView.UpdateLineNumberWidth();
 			m_Path = path;
 			m_Name = m_Path.Mid(m_Path.ReverseFind(L'\\') + 1);
 			BuildTree();
@@ -329,9 +330,9 @@ LRESULT CMainView::OnFind(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
 LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
 	CSimpleFileDialog dlg(FALSE, L"inf", L"", OFN_ENABLESIZING | OFN_EXPLORER | OFN_OVERWRITEPROMPT,
 		L"INF Files\0*.inf;*.inx\0", m_hWnd);
-	ThemeHelper::Suspend();
-	auto result = dlg.DoModal();
-	ThemeHelper::Resume();
+	WTLHelper::SuspendHook();
+	auto result = dlg.DoModal(m_hWnd);
+	WTLHelper::ResumeHook();
 	if (result == IDOK) {
 		m_Path = dlg.m_szFileName;
 		m_Name = dlg.m_szFileTitle;

@@ -3,6 +3,7 @@
 #include <ListViewhelper.h>
 #include <algorithm>
 #include <cwctype>
+#include <algorithm>
 #include <shlwapi.h>
 #include <shlobj.h>
 #include <ClipboardHelper.h>
@@ -54,8 +55,14 @@ LRESULT CDriversView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 	m_Filter.Create(m_hWnd, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE, IDC_FILTER);
 	m_Filter.SetCueBannerText(L"Filter (name, provider, class, version)", TRUE);
 	m_Inbox.Create(m_hWnd, rcDefault, L"Show inbox drivers", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 0, IDC_INBOX);
-	m_List.Create(m_hWnd, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPSIBLINGS | LVS_REPORT | LVS_OWNERDATA | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
+	m_Splitter.Create(m_hWnd, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+	m_List.Create(m_Splitter, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPSIBLINGS | LVS_REPORT | LVS_OWNERDATA | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
 		0, IDC_LIST);
+	m_Devices.Create(m_Splitter, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPSIBLINGS | LVS_REPORT | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER,
+		0, IDC_DEVICES);
+	m_Devices.SetExtendedListViewStyle(LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_INFOTIP);
+	m_Splitter.SetSplitterPanes(m_List, m_Devices);
+	m_Splitter.SetSplitterPosPct(70);
 	m_List.SetExtendedListViewStyle(LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_INFOTIP | LVS_EX_HEADERDRAGDROP);
 
 	// (widths at 96 DPI, scaled; ListViewHelper scales them when the DPI changes)
@@ -66,11 +73,15 @@ LRESULT CDriversView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 	} columns[] = {
 		{ L"Name", 110, LVCFMT_LEFT }, { L"Original Name", 170, LVCFMT_LEFT }, { L"Provider", 170, LVCFMT_LEFT },
 		{ L"Class", 110, LVCFMT_LEFT }, { L"Date", 85, LVCFMT_LEFT }, { L"Version", 120, LVCFMT_LEFT },
-		{ L"Driver Store Folder", 330, LVCFMT_LEFT },
+		{ L"Devices", 70, LVCFMT_RIGHT }, { L"Driver Store Folder", 330, LVCFMT_LEFT },
 	};
 	for (int i = 0; i < _countof(columns); i++)
 		m_List.InsertColumn(i, columns[i].Title, columns[i].Format, DpiHelper::Scale(columns[i].Width, dpi));
 	ListViewHelper::EnableColumnDpiScaling(m_List);
+	m_Devices.InsertColumn(0, L"Device", LVCFMT_LEFT, DpiHelper::Scale(330, dpi));
+	m_Devices.InsertColumn(1, L"Status", LVCFMT_LEFT, DpiHelper::Scale(110, dpi));
+	m_Devices.InsertColumn(2, L"Instance ID", LVCFMT_LEFT, DpiHelper::Scale(520, dpi));
+	ListViewHelper::EnableColumnDpiScaling(m_Devices);
 
 	ApplyDpi();
 	AppliedDpi(dpi);
@@ -80,7 +91,7 @@ LRESULT CDriversView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 
 void CDriversView::ApplyDpi() {
 	CFont font(DpiHelper::CreateMessageFont(DpiHelper::GetDpi(m_hWnd)));
-	for (HWND child : { m_Filter.m_hWnd, m_Inbox.m_hWnd, m_List.m_hWnd })
+	for (HWND child : { m_Filter.m_hWnd, m_Inbox.m_hWnd, m_List.m_hWnd, m_Devices.m_hWnd })
 		::SendMessage(child, WM_SETFONT, (WPARAM)font.m_hFont, TRUE);
 	if (m_Font)
 		m_Font.DeleteObject();
@@ -109,7 +120,7 @@ void CDriversView::Layout() {
 	m_Filter.SetWindowPos(nullptr, margin, margin, scale(320), height, SWP_NOZORDER | SWP_NOACTIVATE);
 	m_Inbox.SetWindowPos(nullptr, margin * 3 + scale(320), margin, scale(200), height, SWP_NOZORDER | SWP_NOACTIVATE);
 	int top = margin * 2 + height;
-	m_List.SetWindowPos(nullptr, 0, top, rc.Width(), std::max(0, rc.Height() - top), SWP_NOZORDER | SWP_NOACTIVATE);
+	m_Splitter.SetWindowPos(nullptr, 0, top, rc.Width(), std::max(0, rc.Height() - top), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 LRESULT CDriversView::OnEraseBackground(UINT, WPARAM wParam, LPARAM, BOOL&) {
@@ -150,6 +161,14 @@ void CDriversView::Load() {
 			::PostMessage(hWnd, ProgressMessage, done, count);
 			return true;
 		});
+		// the devices each is for
+		auto devices = InstalledDrivers::DevicesByInf();
+		for (auto& package : packages) {
+			auto name = package.PublishedName;
+			std::transform(name.begin(), name.end(), name.begin(), [](wchar_t ch) { return (wchar_t)std::towlower(ch); });
+			if (auto it = devices.find(name); it != devices.end())
+				package.Devices = std::move(it->second);
+		}
 		// (the view takes them; if it's gone, nobody does)
 		auto result = new std::vector<DriverPackage>(std::move(packages));
 		if (stop.stop_requested() || !::PostMessage(hWnd, LoadedMessage, 0, reinterpret_cast<LPARAM>(result)))
@@ -212,8 +231,11 @@ void CDriversView::UpdateShown() {
 		auto const& p = m_All[i];
 		if (!inbox && !p.ThirdParty)
 			continue;
+		auto deviceMatches = [&] {
+			return std::any_of(p.Devices.begin(), p.Devices.end(), [&](auto const& d) { return ContainsNoCase(d.Name, part) || ContainsNoCase(d.InstanceId, part); });
+		};
 		if (!part.empty() && !ContainsNoCase(p.PublishedName, part) && !ContainsNoCase(p.OriginalName, part) && !ContainsNoCase(p.Provider, part)
-			&& !ContainsNoCase(p.Class, part) && !ContainsNoCase(p.Version, part))
+			&& !ContainsNoCase(p.Class, part) && !ContainsNoCase(p.Version, part) && !deviceMatches())
 			continue;
 		m_Shown.push_back(i);
 	}
@@ -221,11 +243,21 @@ void CDriversView::UpdateShown() {
 		auto const& x = m_All[a];
 		auto const& y = m_All[b];
 		// (text in Explorer's order: oem2 before oem10)
-		int result = m_SortColumn == Version ? CompareVersions(x.Version, y.Version) : ::StrCmpLogicalW(Text(x, m_SortColumn).c_str(), Text(y, m_SortColumn).c_str());
+		int result;
+		if (m_SortColumn == Version)
+			result = CompareVersions(x.Version, y.Version);
+		else if (m_SortColumn == Devices) {
+			auto px = PresentCount(x), py = PresentCount(y);
+			result = px != py ? (px < py ? -1 : 1) : x.Devices.size() < y.Devices.size() ? -1 : x.Devices.size() > y.Devices.size() ? 1 : 0;
+		}
+		else
+			result = ::StrCmpLogicalW(Text(x, m_SortColumn).c_str(), Text(y, m_SortColumn).c_str());
 		return m_Ascending ? result < 0 : result > 0;
 	});
+	m_List.SetItemState(-1, 0, LVIS_SELECTED | LVIS_FOCUSED);
 	m_List.SetItemCountEx((int)m_Shown.size(), LVSICF_NOSCROLL);
 	m_List.Invalidate();
+	ShowDevices(nullptr);
 	if (IsWindowVisible())
 		Frame()->SetStatusText(0, std::format(L"{} driver packages", m_Shown.size()).c_str());
 }
@@ -239,7 +271,11 @@ LRESULT CDriversView::OnGetDispInfo(int, LPNMHDR hdr, BOOL&) {
 	std::wstring_view text = Text(p, item.iSubItem);
 	// the store's folder: its name, not the path to it
 	std::wstring folder;
-	if (item.iSubItem == Store && !p.StorePath.empty()) {
+	if (item.iSubItem == Devices) {
+		folder = DevicesText(p);
+		text = folder;
+	}
+	else if (item.iSubItem == Store && !p.StorePath.empty()) {
 		folder = std::filesystem::path(p.StorePath).parent_path().filename().wstring();
 		text = folder;
 	}
@@ -253,6 +289,40 @@ LRESULT CDriversView::OnColumnClick(int, LPNMHDR hdr, BOOL&) {
 	m_SortColumn = column;
 	UpdateShown();
 	return 0;
+}
+
+size_t CDriversView::PresentCount(DriverPackage const& p) {
+	return std::count_if(p.Devices.begin(), p.Devices.end(), [](auto const& d) { return d.Present; });
+}
+
+std::wstring CDriversView::DevicesText(DriverPackage const& p) {
+	if (p.Devices.empty())
+		return L"";
+	auto present = PresentCount(p);
+	return present == p.Devices.size() ? std::to_wstring(present) : std::format(L"{} ({})", present, p.Devices.size());
+}
+
+LRESULT CDriversView::OnSelectionChanged(int, LPNMHDR hdr, BOOL&) {
+	auto change = reinterpret_cast<NMLISTVIEW*>(hdr);
+	if ((change->uChanged & LVIF_STATE) && ((change->uNewState ^ change->uOldState) & LVIS_SELECTED))
+		ShowDevices(Selected());
+	return 0;
+}
+
+void CDriversView::ShowDevices(DriverPackage const* package) {
+	m_Devices.SetRedraw(FALSE);
+	m_Devices.DeleteAllItems();
+	if (package) {
+		int n = 0;
+		for (auto const& d : package->Devices) {
+			auto status = d.Problem != 0 ? std::format(L"Problem {}", d.Problem) : d.Present ? L"Connected" : L"Not connected";
+			m_Devices.InsertItem(n, d.Name.c_str());
+			m_Devices.SetItemText(n, 1, status.c_str());
+			m_Devices.SetItemText(n, 2, d.InstanceId.c_str());
+			n++;
+		}
+	}
+	m_Devices.SetRedraw(TRUE);
 }
 
 DriverPackage const* CDriversView::Selected() const {

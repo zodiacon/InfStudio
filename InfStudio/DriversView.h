@@ -6,6 +6,7 @@
 #include "..\InfCore\InstalledDrivers.h"
 #include <thread>
 #include <WTLHelper.h>
+#include <CustomSplitterWindow.h>
 
 //
 // File > Browse Installed Drivers: the driver packages Windows has (%windir%\INF), read on a thread of their own; a
@@ -36,6 +37,7 @@ public:
 		NOTIFY_HANDLER(IDC_LIST, LVN_COLUMNCLICK, OnColumnClick)
 		NOTIFY_HANDLER(IDC_LIST, NM_DBLCLK, OnOpen)
 		NOTIFY_HANDLER(IDC_LIST, NM_RETURN, OnOpen)
+		NOTIFY_HANDLER(IDC_LIST, LVN_ITEMCHANGED, OnSelectionChanged)
 		MESSAGE_HANDLER(WM_CONTEXTMENU, OnContextMenu)
 		COMMAND_RANGE_HANDLER(ID_DRIVER_OPEN, ID_DRIVER_COPYPATH, OnDriverCommand)
 		CHAIN_MSG_MAP(CDpiAware<CDriversView>)
@@ -43,9 +45,9 @@ public:
 	END_MSG_MAP()
 
 private:
-	static constexpr UINT IDC_FILTER = 1101, IDC_INBOX = 1102, IDC_LIST = 1103;
+	static constexpr UINT IDC_FILTER = 1101, IDC_INBOX = 1102, IDC_LIST = 1103, IDC_DEVICES = 1104;
 	static constexpr UINT LoadedMessage = WM_APP + 1, ProgressMessage = WM_APP + 2;
-	enum Column { Name, OriginalName, Provider, Class, Date, Version, Store, ColumnCount };
+	enum Column { Name, OriginalName, Provider, Class, Date, Version, Devices, Store, ColumnCount };
 
 	LRESULT OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	LRESULT OnSize(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
@@ -61,6 +63,12 @@ private:
 	LRESULT OnGetDispInfo(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	LRESULT OnColumnClick(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	LRESULT OnOpen(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	// the selected package's devices in the pane under the list
+	LRESULT OnSelectionChanged(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	void ShowDevices(DriverPackage const* package);
+	// the Devices column: the connected ones, and all of them if not the same
+	static std::wstring DevicesText(DriverPackage const& package);
+	static size_t PresentCount(DriverPackage const& package);
 	// A package's menu (right-click, or the menu key / Shift+F10 on the selected one): open its INF or its copy in the
 	// driver store, show either in Explorer, copy its row or its path.
 	LRESULT OnContextMenu(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
@@ -83,7 +91,9 @@ private:
 
 	CEdit m_Filter;
 	CButton m_Inbox;
+	CCustomHorSplitterWindow m_Splitter;	// the packages above, the selected one's devices below
 	CListViewCtrl m_List;
+	CListViewCtrl m_Devices;
 	CFont m_Font;
 	std::vector<DriverPackage> m_All;
 	std::vector<size_t> m_Shown;		// indexes in m_All

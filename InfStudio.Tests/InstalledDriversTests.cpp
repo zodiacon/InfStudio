@@ -133,3 +133,35 @@ TEST_CASE("The driver packages Windows has", "[drivers][system]") {
 		break;
 	}
 }
+
+TEST_CASE("The devices each driver package is for", "[drivers][system]") {
+	auto devices = InstalledDrivers::DevicesByInf();
+	REQUIRE_FALSE(devices.empty());
+
+	// by the packages' names in %windir%\INF (lower case), which are there; each device named, with its instance ID
+	auto dir = InstalledDrivers::InfDirectory();
+	size_t present = 0, found = 0;
+	for (auto const& [inf, uses] : devices) {
+		CAPTURE(std::filesystem::path(inf).string());
+		CHECK(inf.ends_with(L".inf"));
+		CHECK(std::none_of(inf.begin(), inf.end(), [](wchar_t ch) { return ch >= L'A' && ch <= L'Z'; }));
+		if (std::filesystem::exists(dir / inf))
+			found++;
+		for (auto const& d : uses) {
+			CHECK_FALSE(d.InstanceId.empty());
+			CHECK_FALSE(d.Name.empty());
+			if (d.Present)
+				present++;
+		}
+		// (connected ones first, then by name)
+		CHECK(std::is_sorted(uses.begin(), uses.end(), [](auto const& a, auto const& b) {
+			return a.Present != b.Present ? a.Present : _wcsicmp(a.Name.c_str(), b.Name.c_str()) < 0;
+		}));
+	}
+	CHECK(found > 0);
+	CHECK(present > 0);
+	// every machine has a computer device, which machine.inf (or a HAL INF) installs
+	CHECK(std::any_of(devices.begin(), devices.end(), [](auto const& d) {
+		return std::any_of(d.second.begin(), d.second.end(), [](auto const& use) { return use.InstanceId.starts_with(L"ROOT\\") || use.InstanceId.starts_with(L"ACPI\\"); });
+	}));
+}

@@ -2,6 +2,9 @@
 #include "InstalledDrivers.h"
 #include "InfFile.h"
 
+#include <initguid.h>
+#include <devpkey.h>
+
 #include <algorithm>
 #include <cwctype>
 #include <format>
@@ -97,4 +100,60 @@ std::vector<DriverPackage> InstalledDrivers::ReadAll(std::filesystem::path const
 			break;
 	}
 	return packages;
+}
+
+namespace {
+	std::wstring StringProperty(HDEVINFO set, SP_DEVINFO_DATA& device, DEVPROPKEY const& key) {
+		DEVPROPTYPE type = 0;
+		DWORD size = 0;
+		::SetupDiGetDevicePropertyW(set, &device, &key, &type, nullptr, 0, &size, 0);
+		if (size == 0 || type != DEVPROP_TYPE_STRING)
+			return {};
+		std::wstring value(size / sizeof(WCHAR), L'\0');
+		if (!::SetupDiGetDevicePropertyW(set, &device, &key, &type, reinterpret_cast<PBYTE>(value.data()), size, nullptr, 0))
+			return {};
+		value.resize(wcslen(value.c_str()));
+		return value;
+	}
+
+	template<typename T>
+	T ValueProperty(HDEVINFO set, SP_DEVINFO_DATA& device, DEVPROPKEY const& key, T defaultValue) {
+		DEVPROPTYPE type = 0;
+		T value{};
+		if (!::SetupDiGetDevicePropertyW(set, &device, &key, &type, reinterpret_cast<PBYTE>(&value), sizeof(value), nullptr, 0))
+			return defaultValue;
+		return value;
+	}
+}
+
+std::unordered_map<std::wstring, std::vector<DeviceUse>> InstalledDrivers::DevicesByInf() {
+	std::unordered_map<std::wstring, std::vector<DeviceUse>> devices;
+	// every device Windows knows: connected or not
+	auto set = ::SetupDiGetClassDevsW(nullptr, nullptr, nullptr, DIGCF_ALLCLASSES);
+	if (set == INVALID_HANDLE_VALUE)
+		return devices;
+	SP_DEVINFO_DATA device{ sizeof(device) };
+	for (DWORD i = 0; ::SetupDiEnumDeviceInfo(set, i, &device); i++) {
+		auto inf = StringProperty(set, device, DEVPKEY_Device_DriverInfPath);
+		if (inf.empty())
+			continue;
+		std::transform(inf.begin(), inf.end(), inf.begin(), [](wchar_t ch) { return (wchar_t)std::towlower(ch); });
+		DeviceUse use;
+		use.Name = StringProperty(set, device, DEVPKEY_Device_FriendlyName);
+		if (use.Name.empty())
+			use.Name = StringProperty(set, device, DEVPKEY_Device_DeviceDesc);
+		use.InstanceId = StringProperty(set, device, DEVPKEY_Device_InstanceId);
+		use.Present = ValueProperty<DEVPROP_BOOLEAN>(set, device, DEVPKEY_Device_IsPresent, DEVPROP_FALSE) == DEVPROP_TRUE;
+		use.Problem = ValueProperty<ULONG>(set, device, DEVPKEY_Device_ProblemCode, 0);
+		if (use.Name.empty())
+			use.Name = use.InstanceId;
+		devices[inf].push_back(std::move(use));
+	}
+	::SetupDiDestroyDeviceInfoList(set);
+
+	for (auto& [inf, uses] : devices)
+		std::sort(uses.begin(), uses.end(), [](auto const& a, auto const& b) {
+			return a.Present != b.Present ? a.Present : _wcsicmp(a.Name.c_str(), b.Name.c_str()) < 0;
+		});
+	return devices;
 }

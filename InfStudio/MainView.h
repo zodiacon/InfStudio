@@ -11,6 +11,7 @@
 #include "InfVerif.h"
 #include "InfNavigation.h"
 #include "InfCompletion.h"
+#include "InfChecks.h"
 #include "InfLexer.h"
 #include "AppSettings.h"
 #include "DpiAware.h"
@@ -42,6 +43,7 @@ public:
 		NOTIFY_CODE_HANDLER(SCN_CHARADDED, OnCharAdded)
 		NOTIFY_CODE_HANDLER(SCN_AUTOCCOMPLETED, OnAutoCompleted)
 		COMMAND_ID_HANDLER(ID_EDIT_COMPLETE, OnComplete)
+		COMMAND_RANGE_HANDLER(ID_ENCODING_ANSI, ID_ENCODING_UTF16, OnEncoding)
 		NOTIFY_CODE_HANDLER(SCN_DWELLEND, OnDwellEnd)
 		COMMAND_ID_HANDLER(ID_EDIT_GOTO_DEFINITION, OnGoToDefinition)
 		COMMAND_ID_HANDLER(ID_EDIT_GO_BACK, OnGoBack)
@@ -110,7 +112,7 @@ private:
 	void DisplaySaveError();
 	void UpdateUI();
 	bool DoSave(PCWSTR path);
-	// changes not saved: edits, or a new file (from a template) that was never saved
+	// changes not saved: edits, a new file (from a template) that was never saved, or another encoding (m_Unsaved)
 	bool IsDirty() {
 		return m_Unsaved || m_InfView.IsModified();
 	}
@@ -178,7 +180,15 @@ private:
 	LRESULT OnCharAdded(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	LRESULT OnAutoCompleted(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	LRESULT OnComplete(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	// File > Encoding: what the file is saved as (TextEncoding's order); a change is unsaved until the next save
+	LRESULT OnEncoding(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	std::string m_CompletionSuffix;
+
+	// The built-in checks (InfChecks) of the editor's text, run with the tree's analysis: squiggles, their messages when
+	// hovered, and their count in the status bar.
+	void RunChecks(std::string const& text);
+	std::vector<InfProblem> m_CheckProblems;
+	std::wstring m_ProblemsText;
 
 	// the tree's selection follows the caret: the section it is in (unless the selected item has that name already)
 	void FollowCaret();

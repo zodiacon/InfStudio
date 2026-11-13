@@ -107,6 +107,7 @@
     <ClCompile Include="InfNavigationTests.cpp" />
     <ClCompile Include="InfCompletionTests.cpp" />
     <ClCompile Include="InstalledDriversTests.cpp" />
+    <ClCompile Include="InfChecksTests.cpp" />
     <ClCompile Include="..\InfStudio\InfLexer.cpp" />
     <ClCompile Include="..\InfStudio\TextFile.cpp" />
     <ClCompile Include="..\InfStudio\InfTemplates.cpp" />
@@ -115,6 +116,7 @@
     <ClCompile Include="..\InfStudio\InfNavigation.cpp" />
     <ClCompile Include="..\InfStudio\InfLines.cpp" />
     <ClCompile Include="..\InfStudio\InfCompletion.cpp" />
+    <ClCompile Include="..\InfStudio\InfChecks.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\InfCore\InfCore.vcxproj">

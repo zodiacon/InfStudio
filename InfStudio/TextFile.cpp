@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "TextFile.h"
+#include <filesystem>
 
 namespace {
 	std::string WideToMultiByte(UINT codePage, std::wstring_view text, BOOL* usedDefault = nullptr) {
@@ -83,13 +84,34 @@ bool TextFile::Save(PCWSTR path, std::string_view utf8, TextEncoding encoding) {
 			break;
 	}
 
-	// CREATE_ALWAYS: the old contents go, even if longer than the new
-	wil::unique_hfile hFile(::CreateFile(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr));
-	if (!hFile)
+	// The whole text goes to a file of its own next to the file first, then takes its place: a save that fails (a full
+	// disk, a file in use) leaves the file as it was, never cut short.
+	std::filesystem::path target(path);
+	auto temp = target;
+	temp += std::format(L".{}.tmp", ::GetTickCount64());
+	{
+		wil::unique_hfile hFile(::CreateFile(temp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr));
+		if (!hFile)
+			return false;
+		DWORD written = 0;
+		if (!::WriteFile(hFile.get(), bytes.data(), (DWORD)bytes.size(), &written, nullptr) || written != bytes.size()
+			|| !::FlushFileBuffers(hFile.get())) {
+			hFile.reset();
+			::DeleteFile(temp.c_str());
+			return false;
+		}
+	}
+	// ReplaceFile keeps the file's attributes, security and creation time; a new file is moved there
+	BOOL replaced = ::GetFileAttributes(path) != INVALID_FILE_ATTRIBUTES
+		? ::ReplaceFile(path, temp.c_str(), nullptr, REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr)
+		: ::MoveFileEx(temp.c_str(), path, MOVEFILE_WRITE_THROUGH);
+	if (!replaced) {
+		::DeleteFile(temp.c_str());
 		return false;
-
-	DWORD written = 0;
-	return ::WriteFile(hFile.get(), bytes.data(), (DWORD)bytes.size(), &written, nullptr) && written == bytes.size();
+	}
+	// (the temporary file's attribute came along)
+	::SetFileAttributes(path, ::GetFileAttributes(path) & ~FILE_ATTRIBUTE_TEMPORARY);
+	return true;
 }
 
 bool TextFile::FitsAnsi(std::string_view utf8) {

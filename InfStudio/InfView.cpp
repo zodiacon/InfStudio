@@ -22,6 +22,8 @@ namespace {
 
 	// the indicators that mark InfVerif's problems
 	constexpr int ErrorIndicator = 8, WarningIndicator = 9;
+	// ... and the built-in checks' (InfChecks), under the text they're about
+	constexpr int CheckErrorIndicator = 10, CheckWarningIndicator = 11;
 
 	constexpr EditorColors LightColors{
 		RGB(255, 255, 255), RGB(0, 0, 0), RGB(0, 128, 0), RGB(160, 0, 0), RGB(0, 0, 160), RGB(90, 90, 90), RGB(0, 128, 128), RGB(128, 0, 128), RGB(152, 104, 1),
@@ -128,6 +130,10 @@ void CInfView::ApplyColors() {
 	Execute(SCI_INDICSETFORE, ErrorIndicator, c.ErrorMark);
 	Execute(SCI_INDICSETSTYLE, WarningIndicator, INDIC_SQUIGGLE);
 	Execute(SCI_INDICSETFORE, WarningIndicator, c.WarningMark);
+	Execute(SCI_INDICSETSTYLE, CheckErrorIndicator, INDIC_SQUIGGLE);
+	Execute(SCI_INDICSETFORE, CheckErrorIndicator, c.ErrorMark);
+	Execute(SCI_INDICSETSTYLE, CheckWarningIndicator, INDIC_SQUIGGLE);
+	Execute(SCI_INDICSETFORE, CheckWarningIndicator, c.WarningMark);
 
 	UpdateMargins();
 	Execute(SCI_COLOURISE, 0, -1);
@@ -164,6 +170,20 @@ void CInfView::ShowProblems(std::vector<Problem> const& problems) {
 			continue;
 		Execute(SCI_SETINDICATORCURRENT, problem.Error ? ErrorIndicator : WarningIndicator);
 		Execute(SCI_INDICATORFILLRANGE, start, end - start);
+	}
+}
+
+void CInfView::ShowCheckProblems(std::vector<Range> const& ranges) {
+	auto length = Execute(SCI_GETLENGTH);
+	for (auto indicator : { CheckErrorIndicator, CheckWarningIndicator }) {
+		Execute(SCI_SETINDICATORCURRENT, indicator);
+		Execute(SCI_INDICATORCLEARRANGE, 0, length);
+	}
+	for (auto const& range : ranges) {
+		if (range.Start < 0 || range.End > length || range.End <= range.Start)
+			continue;
+		Execute(SCI_SETINDICATORCURRENT, range.Error ? CheckErrorIndicator : CheckWarningIndicator);
+		Execute(SCI_INDICATORFILLRANGE, range.Start, range.End - range.Start);
 	}
 }
 

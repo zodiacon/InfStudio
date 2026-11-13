@@ -60,6 +60,12 @@ BEGIN
         MENUITEM "&Browse Installed Drivers...", ID_FILE_BROWSEDRIVERS
         MENUITEM "&Save\tCtrl+S",               ID_FILE_SAVE
         MENUITEM "Save &As...",                 ID_FILE_SAVE_AS
+        POPUP "&Encoding"
+        BEGIN
+            MENUITEM "&ANSI",                       ID_ENCODING_ANSI
+            MENUITEM "&UTF-8",                      ID_ENCODING_UTF8
+            MENUITEM "UTF-&16",                     ID_ENCODING_UTF16
+        END
         MENUITEM "&Close",                      ID_FILE_CLOSE
         MENUITEM SEPARATOR
         POPUP "&Recent Files"

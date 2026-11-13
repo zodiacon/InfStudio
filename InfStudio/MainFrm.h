@@ -70,6 +70,8 @@ private:
 	LRESULT OnDpiChanged(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	LRESULT OnDpiChangedPosted(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	void ApplyDpi();
+	// the status bar's panes: the messages (stretched), then what the active tab tells (IMainFrame::SetStatusText's index)
+	enum StatusPane { PaneEncoding = 1, PaneModified, PaneProblems, PanePosition };
 	void SetAlwaysOnTop();
 	void UpdateRecentFilesMenu();
 	bool DoFileOpen(PCWSTR path, PCWSTR name = nullptr);

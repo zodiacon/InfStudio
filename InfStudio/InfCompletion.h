@@ -12,7 +12,7 @@
 // - a key at a line's start: what the section's kind takes ([Version]; an install section a device uses or DefaultInstall,
 //   and its .HW, .Services and .Wdf sections; a service section AddService names; a WDF service section; [DestinationDirs]:
 //   the file sections), then " = "
-// - a field of a value that names sections (CopyFiles, AddReg, Needs..., AddService's third, KmdfService's second):
+// - a field of a value that names sections (CopyFiles, AddReg..., AddService's third, KmdfService's second; not Needs, which names another INF's):
 //   the sections there that a directive can name
 //
 namespace InfCompletion {

@@ -83,6 +83,8 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 
 	CreateSimpleStatusBar();
 	m_StatusBar.SubclassWindow(m_hWndStatusBar);
+	int panes[] = { ID_DEFAULT_PANE, PaneEncoding, PaneModified, PaneProblems, PanePosition };
+	m_StatusBar.SetPanes(panes, _countof(panes), false);
 	CMenuHandle hMenu = GetMenu();
 	if (SecurityHelper::IsRunningElevated()) {
 		hMenu.GetSubMenu(0).DeleteMenu(ID_FILE_RUNASADMINISTRATOR, MF_BYCOMMAND);
@@ -428,10 +430,10 @@ void CMainFrame::ApplyDpi() {
 		if (m_StatusFont)
 			m_StatusFont.DeleteObject();
 		m_StatusFont.Attach(font.Detach());
-		int parts[5];
-		for (int i = 0; i < _countof(parts); i++)
-			parts[i] = DpiHelper::Scale(200 * (i + 1), dpi);
-		m_StatusBar.SetParts(_countof(parts), parts);
+		// (widths at 96 DPI; the messages' pane takes the rest)
+		static const std::pair<int, int> widths[] = { { PaneEncoding, 70 }, { PaneModified, 70 }, { PaneProblems, 100 }, { PanePosition, 130 } };
+		for (auto [pane, width] : widths)
+			m_StatusBar.SetPaneWidth(pane, DpiHelper::Scale(width, dpi));
 	}
 }
 
@@ -523,7 +525,7 @@ void CMainFrame::UpdateUI() {
 			ID_WINDOW_CLOSE, ID_WINDOW_CLOSE_ALL, ID_FILE_CLOSE, ID_FILE_SAVE, ID_FILE_SAVE_AS, ID_EDIT_COPY,
 			ID_EDIT_PASTE, ID_EDIT_CUT, ID_EDIT_UNDO, ID_EDIT_REDO, ID_VIEW_REFRESH, ID_EDIT_DELETE,
 			ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS,
-			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE
+			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE, ID_ENCODING_ANSI, ID_ENCODING_UTF8, ID_ENCODING_UTF16
 		};
 		for (auto id : ids)
 			UIEnable(id, false);

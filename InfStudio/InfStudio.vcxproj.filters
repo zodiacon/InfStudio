@@ -60,6 +60,9 @@
     <ClCompile Include="InfCompletion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="InfChecks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="DriversView.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -123,6 +126,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="InfCompletion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InfChecks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DriversView.h">

@@ -32,6 +32,12 @@ public:
 		bool Error;
 	};
 	void ShowProblems(std::vector<Problem> const& problems);
+	// squiggles under what the built-in checks found (InfChecks: ranges of the text), instead of those there were
+	struct Range {
+		LRESULT Start, End;
+		bool Error;
+	};
+	void ShowCheckProblems(std::vector<Range> const& ranges);
 	// Ctrl+click: called with the position clicked; true if it went somewhere (then the click isn't Scintilla's,
 	// which would add a selection)
 	void SetCtrlClickHandler(std::function<bool(LRESULT)> handler) {

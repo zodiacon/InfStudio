@@ -124,7 +124,7 @@ void CMainView::OnActivated(bool active) {
 		UpdateUI();
 		UI().UIEnable(ID_VIEW_REFRESH, true);
 		for (UINT id : { ID_FILE_SAVE_AS, ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS,
-			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE })
+			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE, ID_ENCODING_ANSI, ID_ENCODING_UTF8, ID_ENCODING_UTF16 })
 			UI().UIEnable(id, true);
 		// (each tab has its own results pane)
 		UI().UISetCheck(ID_VIEW_RESULTS, m_EditSplitter.GetSinglePaneMode() == SPLIT_PANE_NONE);
@@ -157,6 +157,11 @@ void CMainView::UpdateUI() {
 	ui.UIEnable(ID_EDIT_REDO, m_InfView.CanRedo());
 	ui.UIEnable(ID_FILE_SAVE, IsDirty());
 
+	static constexpr PCWSTR encodings[] = { L"ANSI", L"UTF-8", L"UTF-16" };
+	Frame()->SetStatusText(1, encodings[(int)m_Encoding]);
+	Frame()->SetStatusText(2, IsDirty() ? L"Modified" : L"");
+	Frame()->SetStatusText(3, m_ProblemsText.c_str());
+	ui.UISetRadioMenuItem(ID_ENCODING_ANSI + (int)m_Encoding, ID_ENCODING_ANSI, ID_ENCODING_UTF16);
 	Frame()->SetStatusText(4, std::format(L"Line: {} Col: {}",
 		m_InfView.LineNumber(m_InfView.CurrentPos()) + 1, m_InfView.Column(m_InfView.CurrentPos()) + 1).c_str());
 }
@@ -263,6 +268,7 @@ void CMainView::BuildTree() {
 	auto hRoot = InsertTreeItem(m_Tree, m_Name, TreeIconIndex::InfFile, NodeType::Root);
 
 	// the editor's text, saved or not
+	RunChecks(m_InfView.GetText(m_InfView.Length()));
 	if (auto file = WriteTempCopy(); !file.empty()) {
 		InfFile inf;
 		UINT errorLine = 0;
@@ -317,6 +323,7 @@ LRESULT CMainView::OnSave(WORD, WORD, HWND, BOOL&) {
 		DisplaySaveError();
 	else if (!AppSettings::Get().LiveAnalysis())
 		BuildTree();		// (without live analysis, the tree catches up on Save)
+	UpdateUI();
 	return 0;
 }
 
@@ -482,6 +489,7 @@ LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/
 			Frame()->UpdateTabTitle(m_hWnd, m_Name);
 			// (a new file's tree is analyzed now that it is in a file)
 			BuildTree();
+			UpdateUI();
 		}
 		else {
 			DisplaySaveError();
@@ -657,6 +665,12 @@ LRESULT CMainView::OnDwellStart(int, LPNMHDR hdr, BOOL&) {
 	auto pos = reinterpret_cast<SCNotification*>(hdr)->position;
 	if (pos < 0)
 		return 0;
+	// a problem the checks found there: what it is
+	for (auto const& problem : m_CheckProblems)
+		if ((size_t)pos >= problem.Start && (size_t)pos < problem.End) {
+			m_InfView.Execute(SCI_CALLTIPSHOW, pos, reinterpret_cast<LPARAM>(problem.Message.c_str()));
+			return 0;
+		}
 	if (auto value = InfNavigation::StringValueAt(m_InfView.GetText(m_InfView.Length()), pos))
 		m_InfView.Execute(SCI_CALLTIPSHOW, pos, reinterpret_cast<LPARAM>(value->c_str()));
 	return 0;
@@ -771,4 +785,35 @@ LRESULT CMainView::OnAutoCompleted(int, LPNMHDR, BOOL&) {
 LRESULT CMainView::OnComplete(WORD, WORD, HWND, BOOL&) {
 	ShowCompletion(true);
 	return 0;
+}
+
+LRESULT CMainView::OnEncoding(WORD, WORD wID, HWND, BOOL&) {
+	auto encoding = static_cast<TextEncoding>(wID - ID_ENCODING_ANSI);
+	if (encoding == m_Encoding)
+		return 0;
+	m_Encoding = encoding;
+	m_Unsaved = true;
+	UpdateUI();
+	return 0;
+}
+
+void CMainView::RunChecks(std::string const& text) {
+	m_CheckProblems = InfChecks::Check(text);
+	std::vector<CInfView::Range> ranges;
+	int errors = 0, warnings = 0;
+	for (auto const& p : m_CheckProblems) {
+		ranges.push_back({ (LRESULT)p.Start, (LRESULT)p.End, p.Error });
+		(p.Error ? errors : warnings)++;
+	}
+	m_InfView.ShowCheckProblems(ranges);
+	if (errors == 0 && warnings == 0)
+		m_ProblemsText = L"No problems";
+	else if (warnings == 0)
+		m_ProblemsText = std::format(L"{} error{}", errors, errors == 1 ? L"" : L"s");
+	else if (errors == 0)
+		m_ProblemsText = std::format(L"{} warning{}", warnings, warnings == 1 ? L"" : L"s");
+	else
+		m_ProblemsText = std::format(L"{} err, {} warn", errors, warnings);
+	if (IsWindowVisible())
+		Frame()->SetStatusText(3, m_ProblemsText.c_str());
 }

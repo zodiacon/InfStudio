@@ -1,5 +1,6 @@
 #include "TestCommon.h"
 #include "TextFile.h"
+#include <wil/resource.h>
 
 namespace {
 	// UTF-8 of a word with an e acute, a Hebrew word, two Japanese characters and an emoji (a surrogate pair in UTF-16, and in no ANSI code page)
@@ -129,4 +130,44 @@ TEST_CASE("What fits in the ANSI code page", "[textfile]") {
 		CHECK(TextFile::FitsAnsi("Caf\xC3\xA9"));
 		CHECK_FALSE(TextFile::FitsAnsi("\xD7\xA9"));		// Hebrew
 	}
+}
+
+TEST_CASE("A save that fails leaves the file as it was", "[textfile]") {
+	TempFile file(L"inuse.inf");
+	file.Write("the original\r\n");
+	{
+		// the file open without sharing deletion: it can't be replaced
+		wil::unique_hfile open(::CreateFile(file.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr));
+		REQUIRE(open);
+		CHECK_FALSE(TextFile::Save(file.c_str(), "the new text", TextEncoding::Ansi));
+	}
+	CHECK(file.Read() == "the original\r\n");
+	// and nothing of the attempt is left next to it
+	int left = 0;
+	for (auto const& entry : std::filesystem::directory_iterator(file.Path().parent_path()))
+		if (entry.path().filename().wstring().find(file.Path().filename().wstring() + L".") == 0)
+			left++;
+	CHECK(left == 0);
+
+	// a folder that isn't there
+	auto nowhere = file.Path().parent_path() / L"no such folder" / L"x.inf";
+	CHECK_FALSE(TextFile::Save(nowhere.c_str(), "x", TextEncoding::Ansi));
+}
+
+TEST_CASE("Saving keeps the file's attributes", "[textfile]") {
+	TempFile file(L"hidden.inf");
+	file.Write("old");
+	REQUIRE(::SetFileAttributes(file.c_str(), FILE_ATTRIBUTE_HIDDEN));
+	REQUIRE(TextFile::Save(file.c_str(), "new", TextEncoding::Ansi));
+	CHECK(file.Read() == "new");
+	auto attributes = ::GetFileAttributes(file.c_str());
+	CHECK((attributes & FILE_ATTRIBUTE_HIDDEN) != 0);
+	CHECK((attributes & FILE_ATTRIBUTE_TEMPORARY) == 0);
+	::SetFileAttributes(file.c_str(), FILE_ATTRIBUTE_NORMAL);
+
+	// a new file
+	TempFile created(L"created.inf");
+	REQUIRE(TextFile::Save(created.c_str(), "fresh", TextEncoding::Ansi));
+	CHECK(created.Read() == "fresh");
+	CHECK((::GetFileAttributes(created.c_str()) & FILE_ATTRIBUTE_TEMPORARY) == 0);
 }

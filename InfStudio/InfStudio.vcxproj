@@ -343,6 +343,7 @@
     <ClCompile Include="InfNavigation.cpp" />
     <ClCompile Include="InfLines.cpp" />
     <ClCompile Include="InfCompletion.cpp" />
+    <ClCompile Include="InfChecks.cpp" />
     <ClCompile Include="DriversView.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -367,6 +368,7 @@
     <ClInclude Include="InfNavigation.h" />
     <ClInclude Include="InfLines.h" />
     <ClInclude Include="InfCompletion.h" />
+    <ClInclude Include="InfChecks.h" />
     <ClInclude Include="DriversView.h" />
     <ClInclude Include="ViewBase.h" />
   </ItemGroup>

@@ -40,11 +40,12 @@ void CDriversView::OnActivated(bool active) {
 	// (the commands of a file's tab don't apply here)
 	for (UINT id : { ID_FILE_SAVE, ID_FILE_SAVE_AS, ID_EDIT_COPY, ID_EDIT_CUT, ID_EDIT_PASTE, ID_EDIT_UNDO, ID_EDIT_REDO,
 		ID_EDIT_DELETE, ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL,
-		ID_VIEW_RESULTS, ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE })
+		ID_VIEW_RESULTS, ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE, ID_ENCODING_ANSI, ID_ENCODING_UTF8, ID_ENCODING_UTF16 })
 		UI().UIEnable(id, false);
 	UI().UIEnable(ID_VIEW_REFRESH, true);
 	Frame()->SetStatusText(0, std::format(L"{} driver packages", m_Shown.size()).c_str());
-	Frame()->SetStatusText(4, L"");
+	for (int pane = 1; pane <= 4; pane++)
+		Frame()->SetStatusText(pane, L"");
 }
 
 LRESULT CDriversView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {

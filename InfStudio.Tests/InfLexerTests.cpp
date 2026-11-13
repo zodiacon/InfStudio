@@ -1,5 +1,6 @@
 #include "TestCommon.h"
 #include "InfLexer.h"
+#include <scintilla/Scintilla.h>
 
 #include <algorithm>
 
@@ -162,6 +163,7 @@ namespace {
 				if (m_text[i] == '\n')
 					m_lineStarts.push_back(i + 1);
 			m_lineStates.resize(m_lineStarts.size());
+			m_levels.resize(m_lineStarts.size(), SC_FOLDLEVELBASE);
 		}
 
 		std::string LineCodes(Sci_Position line, bool withEnd = false) const {
@@ -186,8 +188,14 @@ namespace {
 		Sci_Position SCI_METHOD LineStart(Sci_Position line) const override {
 			return line < (Sci_Position)m_lineStarts.size() ? (Sci_Position)m_lineStarts[line] : Length();
 		}
-		int SCI_METHOD GetLevel(Sci_Position) const override { return 0; }
-		int SCI_METHOD SetLevel(Sci_Position, int) override { return 0; }
+		int SCI_METHOD GetLevel(Sci_Position line) const override {
+			return line < (Sci_Position)m_levels.size() ? m_levels[line] : SC_FOLDLEVELBASE;
+		}
+		int SCI_METHOD SetLevel(Sci_Position line, int level) override {
+			auto old = m_levels[line];
+			m_levels[line] = level;
+			return old;
+		}
 		int SCI_METHOD GetLineState(Sci_Position line) const override {
 			return line < (Sci_Position)m_lineStates.size() ? m_lineStates[line] : 0;
 		}
@@ -231,6 +239,7 @@ namespace {
 		std::vector<char> m_styles;
 		std::vector<size_t> m_lineStarts;
 		std::vector<int> m_lineStates;
+		std::vector<int> m_levels;
 		Sci_Position m_stylingPos{ 0 };
 	};
 
@@ -281,4 +290,39 @@ TEST_CASE("The Scintilla lexer restyles from inside the document", "[lexer][scin
 	std::fill(doc.m_styles.begin(), doc.m_styles.end(), 0x7F);
 	Lex(doc, doc.LineStart(2) + 3);
 	CHECK(doc.LineCodes(2) == "k.o.n");
+}
+
+TEST_CASE("Sections fold", "[lexer][scintilla]") {
+	constexpr int Base = SC_FOLDLEVELBASE, Header = SC_FOLDLEVELBASE | SC_FOLDLEVELHEADERFLAG;
+	FakeDocument doc(
+		"; before the first section\r\n"	// 0
+		"\r\n"	// 1
+		"[Version]\r\n"	// 2
+		"Class = X\r\n"	// 3
+		"\r\n"	// 4
+		"  [Strings] ; c\r\n"	// 5
+		"A = \"[not a section]\"\r\n"	// 6
+		"B = x \\\r\n"	// 7
+		"[continued, not a section]\r\n"	// 8
+		"C = 1");							// 9
+	Lex(doc);
+	CHECK(doc.GetLevel(0) == Base);
+	CHECK(doc.GetLevel(1) == Base);
+	CHECK(doc.GetLevel(2) == Header);
+	CHECK(doc.GetLevel(3) == Base + 1);
+	CHECK(doc.GetLevel(4) == Base + 1);
+	CHECK(doc.GetLevel(5) == Header);
+	CHECK(doc.GetLevel(6) == Base + 1);
+	CHECK(doc.GetLevel(7) == Base + 1);
+	CHECK(doc.GetLevel(8) == Base + 1);
+	CHECK(doc.GetLevel(9) == Base + 1);
+
+	// from the middle: the lines after a section's header are in it
+	std::fill(doc.m_levels.begin(), doc.m_levels.end(), 0);
+	doc.m_levels[2] = Header;
+	doc.m_levels[3] = Base + 1;
+	Lex(doc, doc.LineStart(4));
+	CHECK(doc.GetLevel(4) == Base + 1);
+	CHECK(doc.GetLevel(5) == Header);
+	CHECK(doc.GetLevel(9) == Base + 1);
 }

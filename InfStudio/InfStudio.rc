@@ -83,6 +83,9 @@ BEGIN
         MENUITEM "Find &Next\tF3",              ID_EDIT_REPEAT
         MENUITEM "Find Pre&vious\tShift+F3",    ID_EDIT_FIND_PREVIOUS
         MENUITEM "R&eplace...\tCtrl+H",         ID_EDIT_REPLACE
+        MENUITEM SEPARATOR
+        MENUITEM "Go to &Definition\tF12",       ID_EDIT_GOTO_DEFINITION
+        MENUITEM "Go &Back\tAlt+Left",          ID_EDIT_GO_BACK
     END
     POPUP "&View"
     BEGIN
@@ -101,6 +104,8 @@ BEGIN
         MENUITEM "&Always on Top",              ID_OPTIONS_ALWAYSONTOP
         MENUITEM "&Font...",                    ID_OPTIONS_FONT
         MENUITEM "&Dark Mode",                  ID_OPTIONS_DARKMODE
+        MENUITEM SEPARATOR
+        MENUITEM "&Live Analysis",              ID_OPTIONS_LIVEANALYSIS
     END
     POPUP "&Window"
     BEGIN
@@ -227,6 +232,8 @@ BEGIN
     VK_F6,          ID_PREV_PANE,           VIRTKEY, SHIFT, NOINVERT
     VK_F5,          ID_VIEW_REFRESH,        VIRTKEY, NOINVERT
     VK_F7,          ID_INF_VALIDATE,        VIRTKEY, NOINVERT
+    VK_F12,         ID_EDIT_GOTO_DEFINITION, VIRTKEY, NOINVERT
+    VK_LEFT,        ID_EDIT_GO_BACK,        VIRTKEY, ALT, NOINVERT
 END
 
 

@@ -51,6 +51,9 @@
     <ClCompile Include="InfVerif.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="InfNavigation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="MainView.cpp">
       <Filter>Views</Filter>
     </ClCompile>
@@ -96,6 +99,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="InfVerif.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorFont.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InfNavigation.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">

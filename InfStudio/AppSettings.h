@@ -10,6 +10,7 @@ public:
 		SETTING(MainWindowPlacement, WINDOWPLACEMENT{}, SettingType::Binary);
 		SETTING(Font, LOGFONT{}, SettingType::Binary);
 		SETTING(AlwaysOnTop, false, SettingType::Bool);
+		SETTING(LiveAnalysis, true, SettingType::Bool);		// the tree follows the editor's text as it is typed (else on Refresh and Save)
 		SETTING(ViewToolBar, 1, SettingType::Bool);
 		SETTING(ViewStatusBar, 1, SettingType::Bool);
 		SETTING(TreeIconSize, 0, SettingType::Int32);
@@ -17,6 +18,7 @@ public:
 	END_SETTINGS
 
 	DEF_SETTING(AlwaysOnTop, bool)
+	DEF_SETTING(LiveAnalysis, bool)
 	DEF_SETTING(MainWindowPlacement, WINDOWPLACEMENT)
 	DEF_SETTING(Font, LOGFONT)
 	DEF_SETTING(TreeIconSize, int)

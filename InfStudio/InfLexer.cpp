@@ -174,7 +174,20 @@ namespace {
 				content--;
 
 			styles.assign(content, Default);
+			auto wasContinued = continued;
 			continued = StyleLine(std::string_view(text.data(), content), continued, styles);
+
+			// folding: a section's header line, and the lines after it in it (those before the first section in none)
+			auto first = std::string_view(text.data(), content).find_first_not_of(" \t");
+			int level;
+			if (!wasContinued && first != std::string_view::npos && styles[first] == Section)
+				level = SC_FOLDLEVELBASE | SC_FOLDLEVELHEADERFLAG;
+			else {
+				auto previous = line > 0 ? styler.LevelAt(line - 1) : SC_FOLDLEVELBASE;
+				auto inSection = (previous & SC_FOLDLEVELHEADERFLAG) || (previous & SC_FOLDLEVELNUMBERMASK) > SC_FOLDLEVELBASE;
+				level = inSection ? SC_FOLDLEVELBASE + 1 : SC_FOLDLEVELBASE;
+			}
+			styler.SetLevel(line, level);
 			for (size_t k = 0; k < content; k++)
 				if (k + 1 == content || styles[k + 1] != styles[k])
 					styler.ColourTo(pos + k, styles[k]);

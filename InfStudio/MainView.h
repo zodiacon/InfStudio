@@ -9,6 +9,12 @@
 #include "TextFile.h"
 #include "EditorSearch.h"
 #include "InfVerif.h"
+#include "InfNavigation.h"
+#include "InfLexer.h"
+#include "AppSettings.h"
+#include "..\InfCore\InfAnalysis.h"
+#include <set>
+#include <filesystem>
 
 class CMainView : 
 	public CViewBase<CMainView>,
@@ -23,9 +29,17 @@ public:
 	bool OnTreeDoubleClick(HWND, HTREEITEM hItem);
 	void OnActivated(bool active);
 	bool CanClose() override;
+	void FontChanged() override;
+	void LiveAnalysisChanged() override;
 
 	BEGIN_MSG_MAP(CMainView)
 		NOTIFY_CODE_HANDLER(SCN_UPDATEUI, OnModified)
+		NOTIFY_CODE_HANDLER(SCN_MODIFIED, OnTextModified)
+		NOTIFY_CODE_HANDLER(SCN_DWELLSTART, OnDwellStart)
+		NOTIFY_CODE_HANDLER(SCN_DWELLEND, OnDwellEnd)
+		COMMAND_ID_HANDLER(ID_EDIT_GOTO_DEFINITION, OnGoToDefinition)
+		COMMAND_ID_HANDLER(ID_EDIT_GO_BACK, OnGoBack)
+		MESSAGE_HANDLER(WM_TIMER, OnTimer)
 		NOTIFY_CODE_HANDLER(TVN_KEYDOWN, OnTreeKeyDown)
 		COMMAND_ID_HANDLER(ID_EDIT_FIND, OnEditFind)
 		COMMAND_ID_HANDLER(ID_EDIT_REPLACE, OnEditReplace)
@@ -95,8 +109,24 @@ private:
 	}
 	// an ANSI file with characters the code page doesn't have: asks whether to save it as Unicode. False if cancelled
 	bool ConfirmEncoding();
+	// The tree of the editor's text (saved or not): its analysis (AnalyzeInf) of a copy in a temporary file,
+	// with what was expanded and selected kept (by the items' texts). Again after an edit, once typing pauses.
 	void BuildTree();
-	void AnalyzeAndBuild(HTREEITEM hRoot);
+	void AddNodes(HTREEITEM hParent, std::vector<InfNode> const& nodes);
+	struct TreeState {
+		std::set<std::vector<std::wstring>> Expanded;
+		std::vector<std::wstring> Selected;
+	};
+	std::vector<std::wstring> TreePath(HTREEITEM hItem) const;
+	void SaveTreeState(HTREEITEM hItem, TreeState& state) const;
+	void RestoreTreeState(HTREEITEM hItem, TreeState const& state);
+	// the editor's text in a file of its own (the view's name, in a temporary folder of the view), for SetupAPI and InfVerif
+	std::filesystem::path WriteTempCopy();
+	static void DeleteTempCopy(std::filesystem::path const& file);
+	static constexpr UINT_PTR AnalysisTimer = 1;
+	static constexpr UINT AnalysisDelay = 500;
+	LRESULT OnTextModified(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	LRESULT OnTimer(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 
 	LRESULT OnSave(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
@@ -126,6 +156,18 @@ private:
 	LRESULT OnResultActivate(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	void GoToLine(int line);
 
+	// Go to Definition (F12, Ctrl+click): what's at pos (InfNavigation::FindDefinition); false if there's nothing to go to.
+	// Go Back (Alt+Left) returns to where it was.
+	bool GoToDefinition(LRESULT pos);
+	LRESULT OnGoToDefinition(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnGoBack(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	// hovering a string key: its value in a tip
+	LRESULT OnDwellStart(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	LRESULT OnDwellEnd(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	// the tree's selection follows the caret: the section it is in (unless the selected item has that name already)
+	void FollowCaret();
+	std::wstring SectionAtCaret();
+
 	static constexpr UINT IDC_RESULTS = 1001;
 
 	CTreeViewCtrl m_Tree;
@@ -135,15 +177,15 @@ private:
 	CListViewCtrl m_Results;
 	std::vector<InfVerifMessage> m_Messages;
 	CInfView m_InfView;
-	InfFile m_Inf;
 	CString m_Path;
 	CString m_Name;
-	UINT m_ErrorLine;
 	int m_TreeIconSize{ 16 };
 	CFindReplaceDialog* m_fr{ nullptr };
 	bool m_frReplace{ false };		// m_fr is a Replace dialog
 	CString m_SearchText, m_ReplaceText;
 	SearchOptions m_Search;
+	std::vector<LRESULT> m_BackPositions;
+	std::wstring m_CaretSection;
 	TextEncoding m_Encoding{ TextEncoding::Ansi };
 	bool m_Unsaved{ false };
 };

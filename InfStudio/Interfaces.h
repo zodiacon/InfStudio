@@ -16,4 +16,8 @@ struct IView {
 	virtual bool CanClose() {
 		return true;
 	}
+	// Options > Font changed the editor's font (in the settings)
+	virtual void FontChanged() {}
+	// Options > Live Analysis was turned on or off (in the settings)
+	virtual void LiveAnalysisChanged() {}
 };

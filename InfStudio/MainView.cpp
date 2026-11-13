@@ -26,6 +26,19 @@ bool CMainView::OpenFile(PCWSTR path) {
 	return true;
 }
 
+void CMainView::FontChanged() {
+	m_InfView.FontChanged();
+	m_InfView.UpdateLineNumberWidth();
+}
+
+void CMainView::LiveAnalysisChanged() {
+	// on: the tree catches up with the text now; off: no update pending
+	if (AppSettings::Get().LiveAnalysis())
+		BuildTree();
+	else
+		KillTimer(AnalysisTimer);
+}
+
 void CMainView::NewFromText(std::string const& text, PCWSTR name) {
 	m_InfView.SetText(text.c_str());
 	m_InfView.EmptyUndoBuffer();
@@ -62,7 +75,8 @@ void CMainView::OnActivated(bool active) {
 	if (active) {
 		UpdateUI();
 		UI().UIEnable(ID_VIEW_REFRESH, true);
-		for (UINT id : { ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS })
+		for (UINT id : { ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS,
+			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK })
 			UI().UIEnable(id, true);
 		// (each tab has its own results pane)
 		UI().UISetCheck(ID_VIEW_RESULTS, m_EditSplitter.GetSinglePaneMode() == SPLIT_PANE_NONE);
@@ -123,68 +137,122 @@ bool CMainView::DoSave(PCWSTR path) {
 	return true;
 }
 
+std::filesystem::path CMainView::WriteTempCopy() {
+	// An ANSI file with characters the code page lacks goes as UTF-16, so that they get there.
+	auto text = m_InfView.GetText(m_InfView.Length());
+	auto encoding = m_Encoding == TextEncoding::Ansi && !TextFile::FitsAnsi(text) ? TextEncoding::Utf16 : m_Encoding;
+	std::error_code ec;
+	// (a folder for each view, as two may have files of the same name)
+	auto dir = std::filesystem::temp_directory_path(ec) / std::format(L"InfStudio-{}", ::GetCurrentProcessId()) / std::format(L"{}", (void*)this);
+	std::filesystem::create_directories(dir, ec);
+	auto file = dir / (m_Name.IsEmpty() ? L"Untitled.inf" : (PCWSTR)m_Name);
+	if (!TextFile::Save(file.c_str(), text, encoding))
+		return {};
+	return file;
+}
+
+void CMainView::DeleteTempCopy(std::filesystem::path const& file) {
+	std::error_code ec;
+	std::filesystem::remove_all(file.parent_path(), ec);
+}
+
+std::vector<std::wstring> CMainView::TreePath(HTREEITEM hItem) const {
+	std::vector<std::wstring> path;
+	for (; hItem; hItem = m_Tree.GetParentItem(hItem)) {
+		CString text;
+		m_Tree.GetItemText(hItem, text);
+		path.insert(path.begin(), (PCWSTR)text);
+	}
+	return path;
+}
+
+void CMainView::SaveTreeState(HTREEITEM hItem, TreeState& state) const {
+	for (; hItem; hItem = m_Tree.GetNextSiblingItem(hItem)) {
+		if (m_Tree.GetItemState(hItem, TVIS_EXPANDED) & TVIS_EXPANDED)
+			state.Expanded.insert(TreePath(hItem));
+		SaveTreeState(m_Tree.GetChildItem(hItem), state);
+	}
+}
+
+void CMainView::RestoreTreeState(HTREEITEM hItem, TreeState const& state) {
+	for (; hItem; hItem = m_Tree.GetNextSiblingItem(hItem)) {
+		auto path = TreePath(hItem);
+		if (state.Expanded.contains(path))
+			m_Tree.Expand(hItem, TVE_EXPAND);
+		if (path == state.Selected)
+			m_Tree.SelectItem(hItem);
+		RestoreTreeState(m_Tree.GetChildItem(hItem), state);
+	}
+}
+
 void CMainView::BuildTree() {
+	// what was open and selected, to open and select again
+	TreeState state;
+	auto hOldRoot = m_Tree.GetRootItem();
+	if (hOldRoot) {
+		SaveTreeState(hOldRoot, state);
+		state.Selected = TreePath(m_Tree.GetSelectedItem());
+		// (the root keeps its place when the file's name changes)
+		CString name;
+		m_Tree.GetItemText(hOldRoot, name);
+		if (name != m_Name) {
+			auto rename = [&](std::vector<std::wstring>& path) {
+				if (!path.empty())
+					path[0] = (PCWSTR)m_Name;
+			};
+			std::set<std::vector<std::wstring>> expanded;
+			for (auto path : state.Expanded) {
+				rename(path);
+				expanded.insert(std::move(path));
+			}
+			state.Expanded = std::move(expanded);
+			rename(state.Selected);
+		}
+	}
+
 	m_Tree.SetRedraw(FALSE);
 	m_Tree.DeleteAllItems();
 	auto hRoot = InsertTreeItem(m_Tree, m_Name, TreeIconIndex::InfFile, NodeType::Root);
-	if (!m_Path.IsEmpty() && !IsDirty()) {
-		//
-		// analyze file
-		//
-		if (!m_Inf.Open(m_Path, nullptr, &m_ErrorLine)) {
-			InsertTreeItem(m_Tree, std::format(L"Error in line {}", m_ErrorLine).c_str(), TreeIconIndex::Error, NodeType::Error, hRoot);
-		}
-		else {
-			AnalyzeAndBuild(hRoot);
-		}
+
+	// the editor's text, saved or not
+	if (auto file = WriteTempCopy(); !file.empty()) {
+		InfFile inf;
+		UINT errorLine = 0;
+		if (inf.Open(file.c_str(), nullptr, &errorLine))
+			AddNodes(hRoot, AnalyzeInf(inf));
+		else
+			InsertTreeItem(m_Tree, std::format(L"Error in line {}", errorLine).c_str(), TreeIconIndex::Error, NodeType::Error, hRoot);
+		inf.Close();
+		DeleteTempCopy(file);
 	}
+
 	m_Tree.Expand(hRoot, TVE_EXPAND);
+	RestoreTreeState(hRoot, state);
 	m_Tree.SetRedraw(TRUE);
 }
 
-void CMainView::AnalyzeAndBuild(HTREEITEM hRoot) {
-	if (m_Inf.SectionExists(L"version")) {
-		InsertTreeItem(m_Tree, L"Version", TreeIconIndex::Version, NodeType::Version, hRoot);
-	}
-	auto mfg = m_Inf.GetSectionCompactLines(L"Manufacturer");
-	if (!mfg.empty()) {
-		auto hMfg = InsertTreeItem(m_Tree, L"Manufacturer", TreeIconIndex::Models, NodeType::Models, hRoot);
-		for (auto& [key, value] : mfg) {
-			for (auto const& model : InfFile::GetModelSections(value)) {
-				auto hModel = InsertTreeItem(m_Tree, model.c_str(), TreeIconIndex::Model, NodeType::Model, hMfg);
-				// each device's install section (the first field of its value), in all its decorations
-				for (auto const& [key, value] : m_Inf.GetSectionCompactLines(model.c_str())) {
-					auto install = value.substr(0, value.find(L','));
-					for (auto const& d : m_Inf.GetInstallDirectives(install)) {
-						static const struct {
-							PCWSTR Name;
-							TreeIconIndex Icon;
-							NodeType Type;
-						} kinds[] = {
-							{ L"CopyFiles", TreeIconIndex::CopyFiles, NodeType::CopyFiles },
-							{ L"DelFiles", TreeIconIndex::DelFiles, NodeType::DelFiles },
-							{ L"AddReg", TreeIconIndex::AddReg, NodeType::AddReg },
-							{ L"DelReg", TreeIconIndex::DelReg, NodeType::DelReg },
-						};
-						auto kind = std::find_if(std::begin(kinds), std::end(kinds), [&](auto const& k) { return d.Directive == k.Name; });
-						ATLASSERT(kind != std::end(kinds));
-						auto hSection = FindChild(m_Tree, hModel, d.Section.c_str());
-						if (!hSection)
-							hSection = InsertTreeItem(m_Tree, d.Section.c_str(), TreeIconIndex::Section, NodeType::Section, hModel, TVI_SORT);
-						if (!FindChild(m_Tree, hSection, d.Target.c_str()))
-							InsertTreeItem(m_Tree, d.Target.c_str(), kind->Icon, kind->Type, hSection, TVI_SORT);
-					}
-				}
-			}
-		}
-	}
-
-	//
-	// add all sections
-	//
-	auto hSections = InsertTreeItem(m_Tree, L"All Sections", TreeIconIndex::Sections, NodeType::Sections, hRoot);
-	for (auto& sec : m_Inf.GetSectionNames()) {
-		InsertTreeItem(m_Tree, sec.c_str(), TreeIconIndex::Section, NodeType::Section, hSections, TVI_SORT);
+void CMainView::AddNodes(HTREEITEM hParent, std::vector<InfNode> const& nodes) {
+	static const struct {
+		InfNodeKind Kind;
+		TreeIconIndex Icon;
+		NodeType Type;
+	} kinds[] = {
+		{ InfNodeKind::Version, TreeIconIndex::Version, NodeType::Version },
+		{ InfNodeKind::Manufacturer, TreeIconIndex::Models, NodeType::Models },
+		{ InfNodeKind::Models, TreeIconIndex::Model, NodeType::Model },
+		{ InfNodeKind::InstallSection, TreeIconIndex::Section, NodeType::Section },
+		{ InfNodeKind::CopyFiles, TreeIconIndex::CopyFiles, NodeType::CopyFiles },
+		{ InfNodeKind::DelFiles, TreeIconIndex::DelFiles, NodeType::DelFiles },
+		{ InfNodeKind::AddReg, TreeIconIndex::AddReg, NodeType::AddReg },
+		{ InfNodeKind::DelReg, TreeIconIndex::DelReg, NodeType::DelReg },
+		{ InfNodeKind::AllSections, TreeIconIndex::Sections, NodeType::Sections },
+		{ InfNodeKind::Section, TreeIconIndex::Section, NodeType::Section },
+	};
+	for (auto const& node : nodes) {
+		auto kind = std::find_if(std::begin(kinds), std::end(kinds), [&](auto const& k) { return k.Kind == node.Kind; });
+		ATLASSERT(kind != std::end(kinds));
+		auto hItem = InsertTreeItem(m_Tree, node.Text.c_str(), kind->Icon, kind->Type, hParent);
+		AddNodes(hItem, node.Children);
 	}
 }
 
@@ -195,8 +263,12 @@ LRESULT CMainView::OnSave(WORD, WORD, HWND, BOOL&) {
 	if (!IsDirty())
 		return false;
 
-	if (ConfirmEncoding() && !DoSave(m_Path))
+	if (!ConfirmEncoding())
+		return 0;
+	if (!DoSave(m_Path))
 		DisplaySaveError();
+	else if (!AppSettings::Get().LiveAnalysis())
+		BuildTree();		// (without live analysis, the tree catches up on Save)
 	return 0;
 }
 
@@ -244,6 +316,7 @@ LRESULT CMainView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 	}
 	m_Tree.SetImageList(images, TVSIL_NORMAL);
 
+	m_InfView.SetCtrlClickHandler([this](LRESULT pos) { return GoToDefinition(pos); });
 	m_Splitter.SetSplitterPanes(m_Tree, m_EditSplitter);
 	m_Splitter.SetSplitterPosPct(20);
 
@@ -263,7 +336,9 @@ LRESULT CMainView::OnTextChanged(WORD, WORD, HWND, BOOL&) {
 	return 0;
 }
 
-LRESULT CMainView::OnModified(int, LPNMHDR, BOOL&) {
+LRESULT CMainView::OnModified(int, LPNMHDR hdr, BOOL&) {
+	if (reinterpret_cast<SCNotification*>(hdr)->updated & SC_UPDATE_SELECTION)
+		FollowCaret();
 	UpdateUI();
 	return 0;
 }
@@ -389,8 +464,32 @@ LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/
 }
 
 LRESULT CMainView::OnRefresh(WORD, WORD, HWND, BOOL&) {
-	SendMessage(WM_COMMAND, ID_FILE_SAVE);
+	// (the tree is of the editor's text, saved or not: nothing to save first)
+	KillTimer(AnalysisTimer);
 	CWaitCursor wait;
+	BuildTree();
+	return 0;
+}
+
+LRESULT CMainView::OnTextModified(int, LPNMHDR hdr, BOOL& bHandled) {
+	auto scn = reinterpret_cast<SCNotification*>(hdr);
+	if (scn->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) {
+		// the tree again once typing pauses (Options > Live Analysis)
+		if (AppSettings::Get().LiveAnalysis())
+			SetTimer(AnalysisTimer, AnalysisDelay);
+		if (scn->linesAdded)
+			m_InfView.UpdateLineNumberWidth();
+	}
+	bHandled = FALSE;
+	return 0;
+}
+
+LRESULT CMainView::OnTimer(UINT, WPARAM id, LPARAM, BOOL& bHandled) {
+	if (id != AnalysisTimer) {
+		bHandled = FALSE;
+		return 0;
+	}
+	KillTimer(AnalysisTimer);
 	BuildTree();
 	return 0;
 }
@@ -409,14 +508,8 @@ void CMainView::Validate(PCWSTR mode) {
 	}
 
 	// The editor's text, saved or not, goes to a file of its own by the same name (InfVerif checks the name too).
-	// An ANSI file with characters the code page lacks goes as UTF-16, so that they get there.
-	auto text = m_InfView.GetText(m_InfView.Length());
-	auto encoding = m_Encoding == TextEncoding::Ansi && !TextFile::FitsAnsi(text) ? TextEncoding::Utf16 : m_Encoding;
-	std::error_code ec;
-	auto dir = std::filesystem::temp_directory_path(ec) / std::format(L"InfStudio-{}", ::GetCurrentProcessId());
-	std::filesystem::create_directories(dir, ec);
-	auto file = dir / (m_Name.IsEmpty() ? L"Untitled.inf" : (PCWSTR)m_Name);
-	if (!TextFile::Save(file.c_str(), text, encoding)) {
+	auto file = WriteTempCopy();
+	if (file.empty()) {
 		AtlMessageBox(m_hWnd, L"Failed to write the file for InfVerif.", IDS_TITLE, MB_ICONERROR);
 		return;
 	}
@@ -427,7 +520,7 @@ void CMainView::Validate(PCWSTR mode) {
 		Frame()->SetStatusText(0, L"Running InfVerif...");
 		result = InfVerif::Run(infverif, mode, file);
 	}
-	std::filesystem::remove_all(dir, ec);
+	DeleteTempCopy(file);
 	if (!result.Ran) {
 		Frame()->SetStatusText(0, L"");
 		AtlMessageBox(m_hWnd, std::format(L"Failed to run {}.", infverif.wstring()).c_str(), IDS_TITLE, MB_ICONERROR);
@@ -494,4 +587,107 @@ void CMainView::GoToLine(int line) {
 	m_InfView.Execute(SCI_GOTOLINE, line - 1);
 	m_InfView.Execute(SCI_VERTICALCENTRECARET);
 	m_InfView.SetFocus();
+}
+
+bool CMainView::GoToDefinition(LRESULT pos) {
+	auto definition = InfNavigation::FindDefinition(m_InfView.GetText(m_InfView.Length()), pos);
+	if (definition == std::string::npos) {
+		Frame()->SetStatusText(0, L"Nothing to go to");
+		return false;
+	}
+	m_BackPositions.push_back(m_InfView.Execute(SCI_GETCURRENTPOS));
+	if (m_BackPositions.size() > 100)
+		m_BackPositions.erase(m_BackPositions.begin());
+	m_InfView.Execute(SCI_ENSUREVISIBLE, m_InfView.Execute(SCI_LINEFROMPOSITION, definition));
+	m_InfView.Execute(SCI_GOTOPOS, definition);
+	m_InfView.Execute(SCI_VERTICALCENTRECARET);
+	m_InfView.SetFocus();
+	return true;
+}
+
+LRESULT CMainView::OnGoToDefinition(WORD, WORD, HWND, BOOL&) {
+	if (!GoToDefinition(m_InfView.Execute(SCI_GETCURRENTPOS)))
+		::MessageBeep(MB_OK);
+	return 0;
+}
+
+LRESULT CMainView::OnGoBack(WORD, WORD, HWND, BOOL&) {
+	if (m_BackPositions.empty()) {
+		::MessageBeep(MB_OK);
+		return 0;
+	}
+	// (the text may have changed since: within it)
+	auto pos = std::min(m_BackPositions.back(), m_InfView.Execute(SCI_GETLENGTH));
+	m_BackPositions.pop_back();
+	m_InfView.Execute(SCI_ENSUREVISIBLE, m_InfView.Execute(SCI_LINEFROMPOSITION, pos));
+	m_InfView.Execute(SCI_GOTOPOS, pos);
+	m_InfView.Execute(SCI_VERTICALCENTRECARET);
+	m_InfView.SetFocus();
+	return 0;
+}
+
+LRESULT CMainView::OnDwellStart(int, LPNMHDR hdr, BOOL&) {
+	auto pos = reinterpret_cast<SCNotification*>(hdr)->position;
+	if (pos < 0)
+		return 0;
+	if (auto value = InfNavigation::StringValueAt(m_InfView.GetText(m_InfView.Length()), pos))
+		m_InfView.Execute(SCI_CALLTIPSHOW, pos, reinterpret_cast<LPARAM>(value->c_str()));
+	return 0;
+}
+
+LRESULT CMainView::OnDwellEnd(int, LPNMHDR, BOOL&) {
+	m_InfView.Execute(SCI_CALLTIPCANCEL);
+	return 0;
+}
+
+std::wstring CMainView::SectionAtCaret() {
+	// the closest section header above the caret (the lexer has styled everything up to what's shown)
+	for (auto line = m_InfView.Execute(SCI_LINEFROMPOSITION, m_InfView.Execute(SCI_GETCURRENTPOS)); line >= 0; line--) {
+		auto start = m_InfView.Execute(SCI_GETLINEINDENTPOSITION, line);
+		if (m_InfView.Execute(SCI_GETCHARAT, start) != '[' || m_InfView.Execute(SCI_GETSTYLEAT, start) != InfLexer::Section)
+			continue;
+		auto end = m_InfView.Execute(SCI_GETLINEENDPOSITION, line);
+		std::string text(end - start + 1, '\0');
+		Sci_TextRangeFull range{ { start, end }, text.data() };
+		m_InfView.Execute(SCI_GETTEXTRANGEFULL, 0, reinterpret_cast<LPARAM>(&range));
+		text.resize(end - start);
+		auto close = text.find(']');
+		auto name = text.substr(1, close == std::string::npos ? std::string::npos : close - 1);
+		auto first = name.find_first_not_of(" \t");
+		if (first == std::string::npos)
+			return {};
+		name = name.substr(first, name.find_last_not_of(" \t") - first + 1);
+		return TextFile::FromUtf8(name);
+	}
+	return {};
+}
+
+void CMainView::FollowCaret() {
+	auto section = SectionAtCaret();
+	if (section == m_CaretSection)
+		return;
+	m_CaretSection = section;
+	if (section.empty())
+		return;
+
+	if (auto hSelected = m_Tree.GetSelectedItem()) {
+		CString selected;
+		m_Tree.GetItemText(hSelected, selected);
+		if (_wcsicmp(selected, section.c_str()) == 0)
+			return;
+	}
+	// the section under All Sections
+	for (auto hItem = m_Tree.GetChildItem(m_Tree.GetRootItem()); hItem; hItem = m_Tree.GetNextSiblingItem(hItem)) {
+		if (m_Tree.GetItemData(hItem) != (DWORD_PTR)NodeType::Sections)
+			continue;
+		for (auto hSection = m_Tree.GetChildItem(hItem); hSection; hSection = m_Tree.GetNextSiblingItem(hSection)) {
+			CString name;
+			m_Tree.GetItemText(hSection, name);
+			if (_wcsicmp(name, section.c_str()) == 0) {
+				m_Tree.SelectItem(hSection);
+				m_Tree.EnsureVisible(hSection);
+				return;
+			}
+		}
+	}
 }

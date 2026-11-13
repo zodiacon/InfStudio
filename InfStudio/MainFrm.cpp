@@ -13,6 +13,7 @@
 #include <DpiHelper.h>
 #include <WTLHelper.h>
 #include "InfTemplates.h"
+#include "EditorFont.h"
 
 const int WINDOW_MENU_POSITION = 5;
 
@@ -107,6 +108,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	InitMenu(GetMenu());
 	UIAddMenu(GetMenu());
 	UISetCheck(ID_OPTIONS_DARKMODE, WTLHelper::IsDarkMode());
+	UISetCheck(ID_OPTIONS_LIVEANALYSIS, settings.LiveAnalysis());
 	SetAlwaysOnTop();
 	UpdateRecentFilesMenu();
 
@@ -349,6 +351,31 @@ LRESULT CMainFrame::OnToggleDarkMode(WORD, WORD, HWND, BOOL&) {
 	return 0;
 }
 
+LRESULT CMainFrame::OnOptionsFont(WORD, WORD, HWND, BOOL&) {
+	auto lf = EditorFont::ForDialog(AppSettings::Get().Font(), (int)DpiHelper::GetDpi(m_hWnd));
+	CFontDialog dlg(&lf, CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_NOSCRIPTSEL | CF_NOVERTFONTS, nullptr, m_hWnd);
+	if (!WTLHelper::InvokeFontDialog(dlg, m_hWnd))
+		return 0;
+
+	LOGFONT chosen{};
+	dlg.GetCurrentFont(&chosen);
+	AppSettings::Get().Font(EditorFont::FromDialog(chosen, dlg.GetSize()));
+	for (int i = 0; i < m_view.GetPageCount(); i++)
+		if (auto view = ViewOfPage(i))
+			view->FontChanged();
+	return 0;
+}
+
+LRESULT CMainFrame::OnLiveAnalysis(WORD, WORD, HWND, BOOL&) {
+	auto& settings = AppSettings::Get();
+	settings.LiveAnalysis(!settings.LiveAnalysis());
+	UISetCheck(ID_OPTIONS_LIVEANALYSIS, settings.LiveAnalysis());
+	for (int i = 0; i < m_view.GetPageCount(); i++)
+		if (auto view = ViewOfPage(i))
+			view->LiveAnalysisChanged();
+	return 0;
+}
+
 void CMainFrame::UpdateRecentFilesMenu() {
 	if (s_recentFiles.IsEmpty())
 		return;
@@ -404,7 +431,8 @@ void CMainFrame::UpdateUI() {
 		UINT ids[] = {
 			ID_WINDOW_CLOSE, ID_WINDOW_CLOSE_ALL, ID_FILE_CLOSE, ID_FILE_SAVE, ID_FILE_SAVE_AS, ID_EDIT_COPY,
 			ID_EDIT_PASTE, ID_EDIT_CUT, ID_EDIT_UNDO, ID_EDIT_REDO, ID_VIEW_REFRESH, ID_EDIT_DELETE,
-			ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS
+			ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS,
+			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK
 		};
 		for (auto id : ids)
 			UIEnable(id, false);

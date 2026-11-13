@@ -340,6 +340,7 @@
     <ClCompile Include="InfTemplates.cpp" />
     <ClCompile Include="EditorSearch.cpp" />
     <ClCompile Include="InfVerif.cpp" />
+    <ClCompile Include="InfNavigation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AboutDlg.h" />
@@ -358,6 +359,8 @@
     <ClInclude Include="InfTemplates.h" />
     <ClInclude Include="EditorSearch.h" />
     <ClInclude Include="InfVerif.h" />
+    <ClInclude Include="EditorFont.h" />
+    <ClInclude Include="InfNavigation.h" />
     <ClInclude Include="ViewBase.h" />
   </ItemGroup>
   <ItemGroup>

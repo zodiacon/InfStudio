@@ -12,6 +12,7 @@
 #include <IconHelper.h>
 #include <DpiHelper.h>
 #include <WTLHelper.h>
+#include "InfTemplates.h"
 
 const int WINDOW_MENU_POSITION = 5;
 
@@ -61,6 +62,8 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 		GetWindowText(text);
 		SetWindowText(text + L" (Administrator)");
 	}
+
+	AddTemplatesMenu(hMenu.GetSubMenu(0));
 
 	CreateSimpleReBar(ATL_SIMPLE_REBAR_NOBORDER_STYLE);
 	auto tb = ToolbarHelper::CreateAndInitToolBar(m_hWnd, buttons, _countof(buttons));
@@ -178,6 +181,34 @@ LRESULT CMainFrame::OnFileNew(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl
 	m_view.AddPage(pView->m_hWnd, L"(Untitled)", 0, static_cast<IView*>(pView));
 	UpdateUI();
 
+	return 0;
+}
+
+void CMainFrame::AddTemplatesMenu(CMenuHandle fileMenu) {
+	CMenuHandle templates;
+	templates.CreatePopupMenu();
+	auto all = InfTemplates::All();
+	ATLASSERT(all.size() <= ID_TEMPLATE_LAST - ID_TEMPLATE_FIRST + 1);
+	for (size_t i = 0; i < all.size(); i++) {
+		if (i > 0 && all[i].Group != all[i - 1].Group)
+			templates.AppendMenu(MF_SEPARATOR);
+		templates.AppendMenu(MF_STRING, ID_TEMPLATE_FIRST + (UINT)i, all[i].Name);
+	}
+	// right after New
+	int count = fileMenu.GetMenuItemCount();
+	int pos = 0;
+	while (pos < count && fileMenu.GetMenuItemID(pos) != ID_FILE_NEW)
+		pos++;
+	fileMenu.InsertMenu(pos < count ? pos + 1 : 0, MF_BYPOSITION | MF_POPUP, (UINT_PTR)templates.m_hMenu, L"New from &Template");
+}
+
+LRESULT CMainFrame::OnNewFromTemplate(WORD, WORD wID, HWND, BOOL&) {
+	auto const& infTemplate = InfTemplates::All()[wID - ID_TEMPLATE_FIRST];
+	auto pView = new CMainView(this);
+	pView->Create(m_view, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+	pView->NewFromText(InfTemplates::Generate(infTemplate, InfTemplates::NewValues()), infTemplate.FileName);
+	m_view.AddPage(pView->m_hWnd, CString(infTemplate.FileName) + L" (new)", 0, static_cast<IView*>(pView));
+	UpdateUI();
 	return 0;
 }
 

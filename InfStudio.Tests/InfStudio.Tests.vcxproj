@@ -99,8 +99,10 @@
     <ClCompile Include="InfLexerTests.cpp" />
     <ClCompile Include="TextFileTests.cpp" />
     <ClCompile Include="InfFileTests.cpp" />
+    <ClCompile Include="InfTemplatesTests.cpp" />
     <ClCompile Include="..\InfStudio\InfLexer.cpp" />
     <ClCompile Include="..\InfStudio\TextFile.cpp" />
+    <ClCompile Include="..\InfStudio\InfTemplates.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\InfCore\InfCore.vcxproj">

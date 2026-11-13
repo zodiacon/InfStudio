@@ -26,6 +26,18 @@ bool CMainView::OpenFile(PCWSTR path) {
 	return true;
 }
 
+void CMainView::NewFromText(std::string const& text, PCWSTR name) {
+	m_InfView.SetText(text.c_str());
+	m_InfView.EmptyUndoBuffer();
+	// (which leaves the editor unmodified: the text isn't in a file yet, so it counts as unsaved until it is)
+	m_Unsaved = true;
+	m_InfView.UpdateLineNumberWidth();
+	m_Path.Empty();
+	m_Name = name;
+	m_Encoding = TextEncoding::Ansi;
+	BuildTree();
+}
+
 bool CMainView::OnTreeDoubleClick(HWND, HTREEITEM hItem) {
 	if (auto data = m_Tree.GetItemData(hItem); data >= (int)NodeType::Section) {
 		//
@@ -55,14 +67,14 @@ void CMainView::OnActivated(bool active) {
 }
 
 bool CMainView::CanClose() {
-	if (m_InfView.IsModified()) {
+	if (IsDirty()) {
 		int result = AtlMessageBox(m_hWnd, L"Save file before close?", IDS_TITLE, MB_YESNOCANCEL | MB_DEFBUTTON1 | MB_ICONQUESTION);
 		if (result == IDCANCEL)
 			return false;
 		if (result == IDYES) {
 			SendMessage(WM_COMMAND, ID_FILE_SAVE);
 			// not saved (failed, or cancelled in Save As): the file stays open
-			if (m_InfView.IsModified())
+			if (IsDirty())
 				return false;
 		}
 	}
@@ -77,7 +89,7 @@ void CMainView::UpdateUI() {
 	ui.UIEnable(ID_EDIT_PASTE, m_InfView.CanPaste());
 	ui.UIEnable(ID_EDIT_UNDO, m_InfView.CanUndo());
 	ui.UIEnable(ID_EDIT_REDO, m_InfView.CanRedo());
-	ui.UIEnable(ID_FILE_SAVE, m_InfView.IsModified());
+	ui.UIEnable(ID_FILE_SAVE, IsDirty());
 
 	Frame()->SetStatusText(4, std::format(L"Line: {} Col: {}",
 		m_InfView.LineNumber(m_InfView.CurrentPos()) + 1, m_InfView.Column(m_InfView.CurrentPos()) + 1).c_str());
@@ -103,6 +115,7 @@ bool CMainView::DoSave(PCWSTR path) {
 		return false;
 
 	m_InfView.SetSavePoint();
+	m_Unsaved = false;
 	return true;
 }
 
@@ -110,7 +123,7 @@ void CMainView::BuildTree() {
 	m_Tree.SetRedraw(FALSE);
 	m_Tree.DeleteAllItems();
 	auto hRoot = InsertTreeItem(m_Tree, m_Name, TreeIconIndex::InfFile, NodeType::Root);
-	if (!m_Path.IsEmpty() && !m_InfView.IsModified()) {
+	if (!m_Path.IsEmpty() && !IsDirty()) {
 		//
 		// analyze file
 		//
@@ -175,7 +188,7 @@ LRESULT CMainView::OnSave(WORD, WORD, HWND, BOOL&) {
 	if (m_Path.IsEmpty())
 		return SendMessage(WM_COMMAND, ID_FILE_SAVE_AS);
 
-	if (!m_InfView.IsModified())
+	if (!IsDirty())
 		return false;
 
 	if (ConfirmEncoding() && !DoSave(m_Path))
@@ -306,7 +319,7 @@ LRESULT CMainView::OnFind(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
 }
 
 LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
-	CSimpleFileDialog dlg(FALSE, L"inf", L"", OFN_ENABLESIZING | OFN_EXPLORER | OFN_OVERWRITEPROMPT,
+	CSimpleFileDialog dlg(FALSE, L"inf", m_Name, OFN_ENABLESIZING | OFN_EXPLORER | OFN_OVERWRITEPROMPT,
 		L"INF Files\0*.inf;*.inx\0", m_hWnd);
 	WTLHelper::SuspendHook();
 	auto result = dlg.DoModal(m_hWnd);
@@ -317,6 +330,8 @@ LRESULT CMainView::OnSaveAs(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/
 			m_Path = dlg.m_szFileName;
 			m_Name = dlg.m_szFileTitle;
 			Frame()->UpdateTabTitle(m_hWnd, m_Name);
+			// (a new file's tree is analyzed now that it is in a file)
+			BuildTree();
 		}
 		else {
 			DisplaySaveError();

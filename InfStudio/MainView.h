@@ -15,6 +15,8 @@ public:
 
 	BOOL PreTranslateMessage(MSG* pMsg);
 	bool OpenFile(PCWSTR path);
+	// a new, unsaved file with this text (UTF-8); Save As suggests name
+	void NewFromText(std::string const& text, PCWSTR name);
 	void CreateNew();
 	bool OnTreeDoubleClick(HWND, HTREEITEM hItem);
 	void OnActivated(bool active);
@@ -77,6 +79,10 @@ private:
 	void DisplaySaveError();
 	void UpdateUI();
 	bool DoSave(PCWSTR path);
+	// changes not saved: edits, or a new file (from a template) that was never saved
+	bool IsDirty() {
+		return m_Unsaved || m_InfView.IsModified();
+	}
 	// an ANSI file with characters the code page doesn't have: asks whether to save it as Unicode. False if cancelled
 	bool ConfirmEncoding();
 	void BuildTree();
@@ -105,5 +111,6 @@ private:
 	CFindReplaceDialog* m_fr{ nullptr };
 	CString m_SearchText;
 	TextEncoding m_Encoding{ TextEncoding::Ansi };
+	bool m_Unsaved{ false };
 };
 

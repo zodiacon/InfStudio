@@ -19,7 +19,9 @@ public:
 	std::vector<std::pair<std::wstring, std::wstring>> GetSectionLines(PCWSTR section) const;
 	std::wstring GetStringValue(PCWSTR section, PCWSTR key, UINT index = 0) const;
 	bool SectionExists(PCWSTR name) const;
-	static std::vector<std::wstring> GetStringPairs(std::wstring const& src, wchar_t ch = L',', wchar_t replaced = L'.');
+	// The models sections a Manufacturer line's value names: "Name" names [Name], "Name,NTamd64,NTarm64" names
+	// [Name.NTamd64] and [Name.NTarm64]. Blanks around the fields don't count.
+	static std::vector<std::wstring> GetModelSections(std::wstring_view value);
 
 private:
 	bool Init();

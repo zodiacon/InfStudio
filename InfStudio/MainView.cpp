@@ -133,7 +133,7 @@ void CMainView::AnalyzeAndBuild(HTREEITEM hRoot) {
 	if (!mfg.empty()) {
 		auto hMfg = InsertTreeItem(m_Tree, L"Manufacturer", TreeIconIndex::Models, NodeType::Models, hRoot);
 		for (auto& [key, value] : mfg) {
-			for (auto const& model : InfFile::GetStringPairs(value)) {
+			for (auto const& model : InfFile::GetModelSections(value)) {
 				auto hModel = InsertTreeItem(m_Tree, model.c_str(), TreeIconIndex::Model, NodeType::Model, hMfg);
 				for (auto const& [key, value] : m_Inf.GetSectionCompactLines(model.c_str())) {
 					auto comma = value.find(L',');

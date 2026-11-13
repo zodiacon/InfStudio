@@ -100,11 +100,49 @@ TEST_CASE("A file that isn't an INF file", "[inffile]") {
 	CHECK_FALSE(inf.Open(missing.c_str()));
 }
 
-TEST_CASE("Decorated model sections", "[inffile]") {
-	// a Manufacturer line's value: the models section and its decorations
-	auto pairs = InfFile::GetStringPairs(L"Contoso,NTamd64,NTarm64");
-	REQUIRE(pairs.size() == 2);
-	CHECK(pairs[0] == L"Contoso.NTamd64");
-	CHECK(pairs[1] == L"Contoso.NTarm64");
-	CHECK(InfFile::GetStringPairs(L"Contoso,NTamd64") == std::vector<std::wstring>{ L"Contoso.NTamd64" });
+using Sections = std::vector<std::wstring>;
+
+TEST_CASE("The models sections a Manufacturer value names", "[inffile]") {
+	// decorated: one section per decoration
+	CHECK(InfFile::GetModelSections(L"Contoso,NTamd64,NTarm64") == Sections{ L"Contoso.NTamd64", L"Contoso.NTarm64" });
+	CHECK(InfFile::GetModelSections(L"Contoso,NTamd64.10.0...16299") == Sections{ L"Contoso.NTamd64.10.0...16299" });
+	// undecorated: the section is the name itself (these were left out of the tree)
+	CHECK(InfFile::GetModelSections(L"Contoso") == Sections{ L"Contoso" });
+	// blanks around the fields don't count, and empty decorations name nothing
+	CHECK(InfFile::GetModelSections(L" Contoso , NTamd64 ") == Sections{ L"Contoso.NTamd64" });
+	CHECK(InfFile::GetModelSections(L"Contoso,,NTamd64,") == Sections{ L"Contoso.NTamd64" });
+	CHECK(InfFile::GetModelSections(L"Contoso,") == Sections{ L"Contoso" });
+	// no name: nothing
+	CHECK(InfFile::GetModelSections(L"").empty());
+	CHECK(InfFile::GetModelSections(L" ,NTamd64").empty());
+}
+
+TEST_CASE("Models sections of a real Manufacturer section", "[inffile]") {
+	TempFile file(L"manufacturers.inf");
+	file.Write(
+		"[Version]\r\n"
+		"Signature = \"$Windows NT$\"\r\n"
+		"[Manufacturer]\r\n"
+		"%A% = Plain\r\n"
+		"%B% = Decorated, NTamd64, NTarm64\r\n"
+		"[Plain]\r\n"
+		"%D% = Install, ID1\r\n"
+		"[Decorated.NTamd64]\r\n"
+		"%D% = Install, ID2\r\n"
+		"[Decorated.NTarm64]\r\n"
+		"%D% = Install, ID3\r\n"
+		"[Strings]\r\n"
+		"A = \"A Inc\"\r\n"
+		"B = \"B Inc\"\r\n"
+		"D = \"Device\"\r\n");
+	InfFile inf;
+	REQUIRE(inf.Open(file.c_str()));
+
+	Sections all;
+	for (auto const& [key, value] : inf.GetSectionCompactLines(L"Manufacturer"))
+		for (auto& section : InfFile::GetModelSections(value))
+			all.push_back(section);
+	CHECK(all == Sections{ L"Plain", L"Decorated.NTamd64", L"Decorated.NTarm64" });
+	for (auto const& section : all)
+		CHECK(inf.SectionExists(section.c_str()));
 }

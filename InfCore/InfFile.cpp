@@ -107,26 +107,38 @@ bool InfFile::SectionExists(PCWSTR name) const {
 	return ::SetupFindFirstLine(m_inf, name, nullptr, &ctx);
 }
 
-std::vector<std::wstring> InfFile::GetStringPairs(std::wstring const& src, wchar_t ch, wchar_t replaced) {
-	// find base string
-	auto pos = src.find(ch);
-	if (pos == std::wstring::npos)
-		return {};
+namespace {
+	std::wstring_view Trim(std::wstring_view text) noexcept {
+		constexpr PCWSTR blanks = L" \t";
+		auto first = text.find_first_not_of(blanks);
+		if (first == std::wstring_view::npos)
+			return {};
+		return text.substr(first, text.find_last_not_of(blanks) - first + 1);
+	}
+}
 
-	auto base = src.substr(0, pos);
-	pos++;
-	std::vector<std::wstring> result;
-	while (true) {
-		auto pos2 = src.find(ch, pos);
-		if (pos2 == std::wstring::npos) {
-			result.emplace_back(base + replaced + src.substr(pos));
+std::vector<std::wstring> InfFile::GetModelSections(std::wstring_view value) {
+	std::vector<std::wstring_view> fields;
+	for (size_t pos = 0;;) {
+		auto comma = value.find(L',', pos);
+		fields.push_back(Trim(value.substr(pos, comma == std::wstring_view::npos ? std::wstring_view::npos : comma - pos)));
+		if (comma == std::wstring_view::npos)
 			break;
-		}
-		result.emplace_back(base + replaced + src.substr(pos, pos2 - pos));
-		pos = pos2 + 1;
+		pos = comma + 1;
 	}
 
-	return result;
+	auto name = fields[0];
+	if (name.empty())
+		return {};
+
+	std::vector<std::wstring> sections;
+	for (size_t i = 1; i < fields.size(); i++)
+		if (!fields[i].empty())
+			sections.push_back(std::wstring(name) + L'.' + std::wstring(fields[i]));
+	// no decorations: the name is the section
+	if (sections.empty())
+		sections.emplace_back(name);
+	return sections;
 }
 
 std::wstring InfFile::GetStringValue(PCWSTR section, PCWSTR key, UINT index) const {

@@ -8,6 +8,7 @@
 #include <NativeCustomTabView.h>
 #include "AppSettings.h"
 #include "RecentFilesManager.h"
+#include "DpiAware.h"
 
 class CMainFrame :
 	public CFrameWindowImpl<CMainFrame>,
@@ -26,10 +27,13 @@ public:
 		MESSAGE_HANDLER(WM_CREATE, OnCreate)
 		MESSAGE_HANDLER(WM_CLOSE, OnClose)
 		MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
+		MESSAGE_HANDLER(WM_DPICHANGED, OnDpiChanged)
+		MESSAGE_HANDLER(CDpiAware<CMainFrame>::DpiChangedMessage, OnDpiChangedPosted)
 		COMMAND_ID_HANDLER(ID_APP_EXIT, OnFileExit)
 		COMMAND_ID_HANDLER(ID_FILE_NEW, OnFileNew)
 		COMMAND_RANGE_HANDLER(ID_TEMPLATE_FIRST, ID_TEMPLATE_LAST, OnNewFromTemplate)
 		COMMAND_ID_HANDLER(ID_FILE_OPEN, OnFileOpen)
+		COMMAND_ID_HANDLER(ID_FILE_BROWSEDRIVERS, OnBrowseDrivers)
 		COMMAND_ID_HANDLER(ID_OPTIONS_ALWAYSONTOP, OnAlwaysOnTop)
 		COMMAND_ID_HANDLER(ID_OPTIONS_DARKMODE, OnToggleDarkMode)
 		COMMAND_ID_HANDLER(ID_OPTIONS_FONT, OnOptionsFont)
@@ -60,6 +64,12 @@ private:
 
 	void UpdateUI();
 	void InitMenu(HMENU menu);
+	// Per-monitor DPI: the window moved to a monitor of another DPI (or its monitor's DPI changed). The window takes the size
+	// Windows suggests and redoes its own parts (ApplyDpi: the tabs' icons, the status bar); the tool bar's images when
+	// it has handled the change itself, which comes after (OnDpiChangedPosted). The views follow on their own (CDpiAware).
+	LRESULT OnDpiChanged(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	LRESULT OnDpiChangedPosted(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
+	void ApplyDpi();
 	void SetAlwaysOnTop();
 	void UpdateRecentFilesMenu();
 	bool DoFileOpen(PCWSTR path, PCWSTR name = nullptr);
@@ -75,6 +85,7 @@ private:
 	void SetStatusText(int index, PCWSTR text) override;
 	HICON GetInfIcon() const override;
 	bool UpdateTabTitle(HWND tab, PCWSTR title) override;
+	bool OpenFile(PCWSTR path) override;
 
 	// Handler prototypes (uncomment arguments if needed):
 	//	LRESULT MessageHandler(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)
@@ -88,6 +99,8 @@ private:
 	LRESULT OnFileNew(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnNewFromTemplate(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	// File > Browse Installed Drivers: the drivers tab (the one there is, or a new one)
+	LRESULT OnBrowseDrivers(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnViewStatusBar(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnAppAbout(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnAlwaysOnTop(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
@@ -105,6 +118,8 @@ private:
 	CNativeCustomTabView m_view;
 	CIcon m_InfIcon;
 	CMultiPaneStatusBarCtrl m_StatusBar;
+	CFont m_StatusFont;
+	CToolBarCtrl m_ToolBar;
 	int m_CurrentPage{ -1 };
 	inline static RecentFilesManager s_recentFiles;
 };

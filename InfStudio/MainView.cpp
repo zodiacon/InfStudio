@@ -3,6 +3,8 @@
 #include "resource.h"
 #include <WTLHelper.h>
 #include "TextFile.h"
+#include <IconHelper.h>
+#include <ListViewhelper.h>
 
 BOOL CMainView::PreTranslateMessage(MSG* pMsg) {
 	if (m_fr && m_fr->IsDialogMessage(pMsg))
@@ -29,6 +31,52 @@ bool CMainView::OpenFile(PCWSTR path) {
 void CMainView::FontChanged() {
 	m_InfView.FontChanged();
 	m_InfView.UpdateLineNumberWidth();
+}
+
+void CMainView::ApplyDpi() {
+	auto dpi = DpiHelper::GetDpi(m_hWnd);
+
+	// the system's message font, at the DPI
+	CFont font(DpiHelper::CreateMessageFont(dpi));
+	m_Tree.SetFont(font);
+	m_Results.SetFont(font);
+	if (m_UiFont)
+		m_UiFont.DeleteObject();
+	m_UiFont.Attach(font.Detach());
+
+	// the icons at the small icon size of the DPI, in TreeIconIndex's order
+	auto size = DpiHelper::SmallIconSize(dpi);
+	auto systemIcon = [&](PCWSTR id) {
+		HICON hIcon = nullptr;
+		::LoadIconWithScaleDown(nullptr, id, size, size, &hIcon);
+		return hIcon;
+	};
+	CImageList tree;
+	tree.Create(size, size, ILC_COLOR32 | ILC_MASK, 16, 8);
+	tree.AddIcon(Frame()->GetInfIcon());
+	tree.AddIcon(CIcon(systemIcon(IDI_ERROR)));
+	for (UINT icon : { IDI_SECTIONS, IDI_SECTION, IDI_REG_EDIT, IDI_REG_DELETE, IDI_DISK_EDIT, IDI_DISK_DELETE, IDI_VERSION, IDI_DEVICES, IDI_DEVICE })
+		tree.AddIcon(CIcon(IconHelper::Load((int)icon, size)));
+	m_Tree.SetImageList(tree, TVSIL_NORMAL);
+	if (m_TreeImages)
+		m_TreeImages.Destroy();
+	m_TreeImages.Attach(tree.Detach());
+
+	// error, warning, information (InfVerifMessage::Severity's order)
+	CImageList results;
+	results.Create(size, size, ILC_COLOR32 | ILC_MASK, 3, 0);
+	for (auto id : { IDI_ERROR, IDI_WARNING, IDI_INFORMATION })
+		results.AddIcon(CIcon(systemIcon(id)));
+	m_Results.SetImageList(results, LVSIL_SMALL);
+	if (m_ResultImages)
+		m_ResultImages.Destroy();
+	m_ResultImages.Attach(results.Detach());
+
+	m_InfView.UpdateMargins();
+}
+
+void CMainView::OnDpiChanged(UINT) {
+	ApplyDpi();
 }
 
 void CMainView::LiveAnalysisChanged() {
@@ -75,8 +123,8 @@ void CMainView::OnActivated(bool active) {
 	if (active) {
 		UpdateUI();
 		UI().UIEnable(ID_VIEW_REFRESH, true);
-		for (UINT id : { ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS,
-			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK })
+		for (UINT id : { ID_FILE_SAVE_AS, ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS,
+			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE })
 			UI().UIEnable(id, true);
 		// (each tab has its own results pane)
 		UI().UISetCheck(ID_VIEW_RESULTS, m_EditSplitter.GetSinglePaneMode() == SPLIT_PANE_NONE);
@@ -281,40 +329,19 @@ LRESULT CMainView::OnCreate(UINT, WPARAM, LPARAM, BOOL&) {
 	m_Results.Create(m_EditSplitter, rcDefault, nullptr,
 		WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS, 0, IDC_RESULTS);
 	m_Results.SetExtendedListViewStyle(LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_INFOTIP);
-	m_Results.InsertColumn(0, L"Line", LVCFMT_RIGHT, 70);
-	m_Results.InsertColumn(1, L"Code", LVCFMT_LEFT, 60);
-	m_Results.InsertColumn(2, L"Problem", LVCFMT_LEFT, 900);
-	{
-		// error, warning, information (InfVerifMessage::Severity's order)
-		CImageList icons;
-		icons.Create(16, 16, ILC_COLOR32 | ILC_MASK, 3, 0);
-		for (auto id : { IDI_ERROR, IDI_WARNING, IDI_INFORMATION }) {
-			HICON hIcon = nullptr;
-			::LoadIconWithScaleDown(nullptr, id, 16, 16, &hIcon);
-			icons.AddIcon(hIcon);
-			::DestroyIcon(hIcon);
-		}
-		m_Results.SetImageList(icons, LVSIL_SMALL);
-	}
+	// (widths at 96 DPI, scaled to the window's; ListViewHelper scales them when the DPI changes)
+	auto dpi = DpiHelper::GetDpi(m_hWnd);
+	m_Results.InsertColumn(0, L"Line", LVCFMT_RIGHT, DpiHelper::Scale(70, dpi));
+	m_Results.InsertColumn(1, L"Code", LVCFMT_LEFT, DpiHelper::Scale(60, dpi));
+	m_Results.InsertColumn(2, L"Problem", LVCFMT_LEFT, DpiHelper::Scale(900, dpi));
+	ListViewHelper::EnableColumnDpiScaling(m_Results);
 	m_EditSplitter.SetSplitterPanes(m_InfView, m_Results);
 	m_EditSplitter.SetSplitterPosPct(75);
 	// (shown once there are results)
 	m_EditSplitter.SetSinglePaneMode(SPLIT_PANE_TOP);
 
-	static CImageList images;
-	if (!images) {
-		images.Create(m_TreeIconSize, m_TreeIconSize, ILC_COLOR32 | ILC_MASK, 16, 8);
-		images.AddIcon(Frame()->GetInfIcon());
-		images.AddIcon(AtlLoadSysIcon(IDI_ERROR));
-
-		UINT icons[] = {
-			IDI_SECTIONS, IDI_SECTION, IDI_REG_EDIT, IDI_REG_DELETE, IDI_DISK_EDIT, IDI_DISK_DELETE, IDI_VERSION,
-			IDI_DEVICES, IDI_DEVICE,
-		};
-		for (auto icon : icons)
-			images.AddIcon(AtlLoadIconImage(icon, 0, m_TreeIconSize, m_TreeIconSize));
-	}
-	m_Tree.SetImageList(images, TVSIL_NORMAL);
+	ApplyDpi();
+	AppliedDpi(dpi);
 
 	m_InfView.SetCtrlClickHandler([this](LRESULT pos) { return GoToDefinition(pos); });
 	m_Splitter.SetSplitterPanes(m_Tree, m_EditSplitter);
@@ -690,4 +717,58 @@ void CMainView::FollowCaret() {
 			}
 		}
 	}
+}
+
+void CMainView::ShowCompletion(bool asked) {
+	auto caret = (size_t)m_InfView.Execute(SCI_GETCURRENTPOS);
+	auto list = InfCompletion::Complete(m_InfView.GetText(m_InfView.Length()), caret);
+	if (!list || list->Items.empty()) {
+		if (asked)
+			::MessageBeep(MB_OK);
+		return;
+	}
+	std::string items;
+	for (auto const& item : list->Items) {
+		if (!items.empty())
+			items += '\n';
+		items += item;
+	}
+	m_CompletionSuffix = list->Suffix;
+	m_InfView.Execute(SCI_AUTOCSHOW, caret - list->Start, reinterpret_cast<LPARAM>(items.c_str()));
+}
+
+LRESULT CMainView::OnCharAdded(int, LPNMHDR hdr, BOOL&) {
+	if (m_InfView.Execute(SCI_AUTOCACTIVE))
+		return 0;
+	auto ch = reinterpret_cast<SCNotification*>(hdr)->ch;
+	auto isWordChar = [](int c) { return isalnum((unsigned char)c) || c == '_' || c == '.' || c == '-' || c == '$'; };
+	if (ch == '%' || ch == '[') {
+		ShowCompletion(false);
+		return 0;
+	}
+	// the first letter of a word
+	auto caret = m_InfView.Execute(SCI_GETCURRENTPOS);
+	auto previous = caret >= 2 ? (int)m_InfView.Execute(SCI_GETCHARAT, caret - 2) : 0;
+	if (ch > 0 && ch < 128 && isWordChar(ch) && !isWordChar(previous))
+		ShowCompletion(false);
+	return 0;
+}
+
+LRESULT CMainView::OnAutoCompleted(int, LPNMHDR, BOOL&) {
+	auto suffix = std::move(m_CompletionSuffix);
+	m_CompletionSuffix.clear();
+	if (suffix.empty())
+		return 0;
+	auto caret = m_InfView.Execute(SCI_GETCURRENTPOS);
+	m_InfView.Execute(SCI_INSERTTEXT, caret, reinterpret_cast<LPARAM>(suffix.c_str()));
+	m_InfView.Execute(SCI_GOTOPOS, caret + suffix.size());
+	// a key: its value next, if it names sections
+	if (suffix == " = ")
+		ShowCompletion(false);
+	return 0;
+}
+
+LRESULT CMainView::OnComplete(WORD, WORD, HWND, BOOL&) {
+	ShowCompletion(true);
+	return 0;
 }

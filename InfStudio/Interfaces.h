@@ -8,6 +8,8 @@ struct IMainFrame abstract {
 	virtual void SetStatusText(int index, PCWSTR text) = 0;
 	virtual HICON GetInfIcon() const = 0;
 	virtual bool UpdateTabTitle(HWND tab, PCWSTR title) = 0;
+	// a file in a tab of its own (and in the recent files); false if it couldn't be opened
+	virtual bool OpenFile(PCWSTR path) = 0;
 };
 
 struct IView {

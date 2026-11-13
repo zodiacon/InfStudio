@@ -54,6 +54,15 @@
     <ClCompile Include="InfNavigation.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="InfLines.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="InfCompletion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DriversView.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="MainView.cpp">
       <Filter>Views</Filter>
     </ClCompile>
@@ -104,7 +113,19 @@
     <ClInclude Include="EditorFont.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DpiAware.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="InfNavigation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InfLines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InfCompletion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DriversView.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">

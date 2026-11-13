@@ -37,6 +37,15 @@ InfFile::operator bool() const {
 	return m_inf != INVALID_HANDLE_VALUE;
 }
 
+std::wstring InfFile::GetOriginalFileName() const {
+	if (!m_info)
+		return {};
+	SP_ORIGINAL_FILE_INFO info{ sizeof(info) };
+	if (!::SetupQueryInfOriginalFileInformation(m_info, 0, nullptr, &info))
+		return {};
+	return info.OriginalInfName;
+}
+
 int InfFile::GetFileCount() const {
 	return m_info ? m_info->InfCount : -1;
 }

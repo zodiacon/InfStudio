@@ -10,15 +10,18 @@
 #include "EditorSearch.h"
 #include "InfVerif.h"
 #include "InfNavigation.h"
+#include "InfCompletion.h"
 #include "InfLexer.h"
 #include "AppSettings.h"
+#include "DpiAware.h"
 #include "..\InfCore\InfAnalysis.h"
 #include <set>
 #include <filesystem>
 
 class CMainView : 
 	public CViewBase<CMainView>,
-	public CTreeViewHelper<CMainView> {
+	public CTreeViewHelper<CMainView>,
+	public CDpiAware<CMainView> {
 public:
 	using CViewBase::CViewBase;
 
@@ -36,6 +39,9 @@ public:
 		NOTIFY_CODE_HANDLER(SCN_UPDATEUI, OnModified)
 		NOTIFY_CODE_HANDLER(SCN_MODIFIED, OnTextModified)
 		NOTIFY_CODE_HANDLER(SCN_DWELLSTART, OnDwellStart)
+		NOTIFY_CODE_HANDLER(SCN_CHARADDED, OnCharAdded)
+		NOTIFY_CODE_HANDLER(SCN_AUTOCCOMPLETED, OnAutoCompleted)
+		COMMAND_ID_HANDLER(ID_EDIT_COMPLETE, OnComplete)
 		NOTIFY_CODE_HANDLER(SCN_DWELLEND, OnDwellEnd)
 		COMMAND_ID_HANDLER(ID_EDIT_GOTO_DEFINITION, OnGoToDefinition)
 		COMMAND_ID_HANDLER(ID_EDIT_GO_BACK, OnGoBack)
@@ -57,6 +63,7 @@ public:
 		NOTIFY_HANDLER(IDC_RESULTS, NM_DBLCLK, OnResultActivate)
 		NOTIFY_HANDLER(IDC_RESULTS, NM_RETURN, OnResultActivate)
 		MESSAGE_HANDLER(WM_CREATE, OnCreate)
+		CHAIN_MSG_MAP(CDpiAware<CMainView>)
 		CHAIN_MSG_MAP_MEMBER(m_InfView)
 		CHAIN_MSG_MAP(CTreeViewHelper<CMainView>)
 		CHAIN_MSG_MAP(CViewBase)
@@ -164,9 +171,26 @@ private:
 	// hovering a string key: its value in a tip
 	LRESULT OnDwellStart(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
 	LRESULT OnDwellEnd(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	// Auto-complete (InfCompletion): shown as a string key, a section header or a word starts (SCN_CHARADDED), and on
+	// Ctrl+Space; the item chosen gets its suffix ('%', ']', " = ") after it, and a key whose value names sections the list
+	// of them next.
+	void ShowCompletion(bool asked);
+	LRESULT OnCharAdded(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	LRESULT OnAutoCompleted(int /*idCtrl*/, LPNMHDR /*pnmh*/, BOOL& /*bHandled*/);
+	LRESULT OnComplete(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	std::string m_CompletionSuffix;
+
 	// the tree's selection follows the caret: the section it is in (unless the selected item has that name already)
 	void FollowCaret();
 	std::wstring SectionAtCaret();
+
+	// Per-monitor DPI (CDpiAware, after the controls have handled the change): the tree's and the results' font and icons,
+	// and the editor's margins
+	friend class CDpiAware<CMainView>;
+	void OnDpiChanged(UINT dpi);
+	void ApplyDpi();
+	CFont m_UiFont;
+	CImageList m_TreeImages, m_ResultImages;
 
 	static constexpr UINT IDC_RESULTS = 1001;
 
@@ -179,7 +203,6 @@ private:
 	CInfView m_InfView;
 	CString m_Path;
 	CString m_Name;
-	int m_TreeIconSize{ 16 };
 	CFindReplaceDialog* m_fr{ nullptr };
 	bool m_frReplace{ false };		// m_fr is a Replace dialog
 	CString m_SearchText, m_ReplaceText;

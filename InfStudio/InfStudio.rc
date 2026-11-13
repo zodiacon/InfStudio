@@ -57,6 +57,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "&New\tCtrl+N",                ID_FILE_NEW
         MENUITEM "&Open...\tCtrl+O",            ID_FILE_OPEN
+        MENUITEM "&Browse Installed Drivers...", ID_FILE_BROWSEDRIVERS
         MENUITEM "&Save\tCtrl+S",               ID_FILE_SAVE
         MENUITEM "Save &As...",                 ID_FILE_SAVE_AS
         MENUITEM "&Close",                      ID_FILE_CLOSE
@@ -86,6 +87,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Go to &Definition\tF12",       ID_EDIT_GOTO_DEFINITION
         MENUITEM "Go &Back\tAlt+Left",          ID_EDIT_GO_BACK
+        MENUITEM "&Complete Word\tCtrl+Space",   ID_EDIT_COMPLETE
     END
     POPUP "&View"
     BEGIN
@@ -233,6 +235,7 @@ BEGIN
     VK_F5,          ID_VIEW_REFRESH,        VIRTKEY, NOINVERT
     VK_F7,          ID_INF_VALIDATE,        VIRTKEY, NOINVERT
     VK_F12,         ID_EDIT_GOTO_DEFINITION, VIRTKEY, NOINVERT
+    VK_SPACE,       ID_EDIT_COMPLETE,       VIRTKEY, CONTROL, NOINVERT
     VK_LEFT,        ID_EDIT_GO_BACK,        VIRTKEY, ALT, NOINVERT
 END
 

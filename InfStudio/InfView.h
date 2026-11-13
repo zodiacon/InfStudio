@@ -24,6 +24,8 @@ public:
 
 	// the line number margin wide enough for the document's line count (at least 4 digits)
 	void UpdateLineNumberWidth();
+	// the margins for the window's DPI (the fold margin's width) and the font's size (the line numbers')
+	void UpdateMargins();
 	// squiggles under the lines with problems (1-based; error or warning), instead of those there were
 	struct Problem {
 		int Line;

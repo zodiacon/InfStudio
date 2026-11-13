@@ -1,58 +1,11 @@
 #include "pch.h"
 #include "InfNavigation.h"
 #include "InfLexer.h"
+#include "InfLines.h"
 
 namespace {
 	using namespace InfLexer;
-
-	// a line of the text and how the lexer styled it
-	struct StyledLine {
-		size_t Start;				// in the text
-		std::string_view Text;		// without the line end
-		std::vector<uint8_t> Styles;
-	};
-
-	std::vector<StyledLine> StyleLines(std::string_view text) {
-		std::vector<StyledLine> lines;
-		bool continued = false;
-		for (size_t start = 0; start <= text.size();) {
-			auto end = text.find('\n', start);
-			auto next = end == std::string_view::npos ? text.size() + 1 : end + 1;
-			if (end == std::string_view::npos)
-				end = text.size();
-			auto content = end;
-			if (content > start && text[content - 1] == '\r')
-				content--;
-			StyledLine line{ start, text.substr(start, content - start) };
-			line.Styles.resize(line.Text.size());
-			continued = StyleLine(line.Text, continued, line.Styles);
-			lines.push_back(std::move(line));
-			start = next;
-		}
-		return lines;
-	}
-
-	std::string_view Trim(std::string_view text) {
-		auto first = text.find_first_not_of(" \t");
-		if (first == std::string_view::npos)
-			return {};
-		return text.substr(first, text.find_last_not_of(" \t") - first + 1);
-	}
-
-	bool EqualNoCase(std::string_view a, std::string_view b) {
-		return a.size() == b.size() && _strnicmp(a.data(), b.data(), a.size()) == 0;
-	}
-
-	// the name of a section header line, if it is one
-	std::optional<std::string_view> SectionName(StyledLine const& line) {
-		auto open = line.Text.find('[');
-		if (open == std::string_view::npos || line.Styles[open] != Section)
-			return {};
-		auto close = line.Text.find(']', open);
-		if (close == std::string_view::npos)
-			close = line.Text.size();
-		return Trim(line.Text.substr(open + 1, close - open - 1));
-	}
+	using namespace InfLines;
 
 	// the line of a string key: in [Strings], else in a localized [Strings.xxxx]
 	StyledLine const* FindStringKey(std::vector<StyledLine> const& lines, std::string_view name) {
@@ -80,13 +33,6 @@ namespace {
 			}
 		}
 		return localized;
-	}
-
-	StyledLine const* LineAt(std::vector<StyledLine> const& lines, size_t pos) {
-		for (auto const& line : lines)
-			if (pos >= line.Start && pos <= line.Start + line.Text.size())
-				return &line;
-		return nullptr;
 	}
 
 	// the string key at offset in its line (between its percents), if there's one

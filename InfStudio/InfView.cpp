@@ -9,6 +9,7 @@
 #include "EditorFont.h"
 #include "AppSettings.h"
 #include "TextFile.h"
+#include <DpiHelper.h>
 
 namespace {
 	// the colors of the editor in one mode (the styles are InfLexer's)
@@ -52,7 +53,6 @@ LRESULT CInfView::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, 
 	// sections fold (InfLexer sets the levels) in margin 1
 	Execute(SCI_SETMARGINTYPEN, 1, SC_MARGIN_SYMBOL);
 	Execute(SCI_SETMARGINMASKN, 1, SC_MASK_FOLDERS);
-	Execute(SCI_SETMARGINWIDTHN, 1, 16);
 	Execute(SCI_SETMARGINSENSITIVEN, 1, TRUE);
 	static constexpr std::pair<int, int> markers[] = {
 		{ SC_MARKNUM_FOLDEROPEN, SC_MARK_BOXMINUS }, { SC_MARKNUM_FOLDER, SC_MARK_BOXPLUS },
@@ -65,6 +65,12 @@ LRESULT CInfView::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, 
 	Execute(SCI_SETAUTOMATICFOLD, SC_AUTOMATICFOLD_SHOW | SC_AUTOMATICFOLD_CLICK | SC_AUTOMATICFOLD_CHANGE);
 	// hovering (SCN_DWELLSTART): a string key's value
 	Execute(SCI_SETMOUSEDWELLTIME, 500);
+	// auto-complete (InfCompletion): one item a line, sorted ignoring case, filtered as typed ignoring case
+	Execute(SCI_AUTOCSETSEPARATOR, '\n');
+	Execute(SCI_AUTOCSETIGNORECASE, TRUE);
+	Execute(SCI_AUTOCSETCASEINSENSITIVEBEHAVIOUR, SC_CASEINSENSITIVEBEHAVIOUR_IGNORECASE);
+	Execute(SCI_AUTOCSETORDER, SC_ORDER_PRESORTED);
+	Execute(SCI_AUTOCSETMAXHEIGHT, 12);
 	ApplyColors();
 
 	return 0;
@@ -111,14 +117,25 @@ void CInfView::ApplyColors() {
 	}
 	Execute(SCI_CALLTIPSETBACK, c.TipBack);
 	Execute(SCI_CALLTIPSETFORE, c.TipText);
+	// the auto-complete list (colours with their alpha, opaque)
+	auto opaque = [](COLORREF color) { return (LPARAM)(color | 0xFF000000); };
+	Execute(SCI_SETELEMENTCOLOUR, SC_ELEMENT_LIST, opaque(c.Text));
+	Execute(SCI_SETELEMENTCOLOUR, SC_ELEMENT_LIST_BACK, opaque(c.TipBack));
+	Execute(SCI_SETELEMENTCOLOUR, SC_ELEMENT_LIST_SELECTED, opaque(c.Text));
+	Execute(SCI_SETELEMENTCOLOUR, SC_ELEMENT_LIST_SELECTED_BACK, opaque(c.Selection));
 
 	Execute(SCI_INDICSETSTYLE, ErrorIndicator, INDIC_SQUIGGLE);
 	Execute(SCI_INDICSETFORE, ErrorIndicator, c.ErrorMark);
 	Execute(SCI_INDICSETSTYLE, WarningIndicator, INDIC_SQUIGGLE);
 	Execute(SCI_INDICSETFORE, WarningIndicator, c.WarningMark);
 
-	UpdateLineNumberWidth();
+	UpdateMargins();
 	Execute(SCI_COLOURISE, 0, -1);
+}
+
+void CInfView::UpdateMargins() {
+	Execute(SCI_SETMARGINWIDTHN, 1, DpiHelper::Scale(16, m_hWnd));
+	UpdateLineNumberWidth();
 }
 
 void CInfView::UpdateLineNumberWidth() {

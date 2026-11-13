@@ -341,6 +341,9 @@
     <ClCompile Include="EditorSearch.cpp" />
     <ClCompile Include="InfVerif.cpp" />
     <ClCompile Include="InfNavigation.cpp" />
+    <ClCompile Include="InfLines.cpp" />
+    <ClCompile Include="InfCompletion.cpp" />
+    <ClCompile Include="DriversView.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AboutDlg.h" />
@@ -360,11 +363,18 @@
     <ClInclude Include="EditorSearch.h" />
     <ClInclude Include="InfVerif.h" />
     <ClInclude Include="EditorFont.h" />
+    <ClInclude Include="DpiAware.h" />
     <ClInclude Include="InfNavigation.h" />
+    <ClInclude Include="InfLines.h" />
+    <ClInclude Include="InfCompletion.h" />
+    <ClInclude Include="DriversView.h" />
     <ClInclude Include="ViewBase.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="InfStudio.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="DpiAware.manifest" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\copy.ico" />

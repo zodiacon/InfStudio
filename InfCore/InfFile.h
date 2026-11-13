@@ -20,6 +20,8 @@ public:
 	operator bool() const;
 
 	int GetFileCount() const;
+	// the INF's name before Windows published it (an installed third party's oemNN.inf); empty if it doesn't know one
+	std::wstring GetOriginalFileName() const;
 	std::vector<std::pair<std::wstring, std::wstring>> GetVersionSectionInfo(PCWSTR key = nullptr, UINT fileIndex = 0) const;
 	std::vector<std::wstring> GetSectionNames() const;
 	std::vector<std::pair<std::wstring, std::wstring>> GetSectionCompactLines(PCWSTR section) const;

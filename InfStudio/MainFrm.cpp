@@ -6,6 +6,7 @@
 #include "resource.h"
 #include "AboutDlg.h"
 #include "MainView.h"
+#include "DriversView.h"
 #include "MainFrm.h"
 #include <ToolbarHelper.h>
 #include "SecurityHelper.h"
@@ -16,6 +17,44 @@
 #include "EditorFont.h"
 
 const int WINDOW_MENU_POSITION = 5;
+
+namespace {
+	const ToolBarButtonInfo ToolBarButtons[] = {
+		{ ID_FILE_OPEN, IDI_OPEN },
+		{ ID_FILE_SAVE, IDI_SAVE },
+		{ 0 },
+		{ ID_EDIT_UNDO, IDI_UNDO },
+		{ ID_EDIT_REDO, IDI_REDO },
+		{ 0 },
+		{ ID_EDIT_CUT, IDI_CUT },
+		{ ID_EDIT_COPY, IDI_COPY },
+		{ ID_EDIT_PASTE, IDI_PASTE },
+		{ 0 },
+		{ ID_VIEW_REFRESH, IDI_REFRESH },
+	};
+
+	// the rebar band of a tool bar sized again to it (as WTL's AddSimpleReBarBandCtrl sizes it when it adds the band)
+	void FitReBarBand(HWND rebar, HWND toolbar) {
+		CReBarCtrl rb(rebar);
+		for (int i = 0; i < (int)rb.GetBandCount(); i++) {
+			REBARBANDINFO band{ sizeof(band), RBBIM_CHILD };
+			if (!rb.GetBandInfo(i, &band) || band.hwndChild != toolbar)
+				continue;
+			int buttons = (int)::SendMessage(toolbar, TB_BUTTONCOUNT, 0, 0);
+			if (buttons == 0)
+				return;
+			band.fMask = RBBIM_CHILDSIZE | RBBIM_SIZE | RBBIM_IDEALSIZE;
+			RECT rc{};
+			::SendMessage(toolbar, TB_GETITEMRECT, buttons - 1, (LPARAM)&rc);
+			band.cx = band.cxIdeal = rc.right;
+			band.cyMinChild = rc.bottom - rc.top;
+			::SendMessage(toolbar, TB_GETITEMRECT, 0, (LPARAM)&rc);
+			band.cxMinChild = rc.right;
+			rb.SetBandInfo(i, &band);
+			return;
+		}
+	}
+}
 
 BOOL CMainFrame::PreTranslateMessage(MSG* pMsg) {
 	// Keys in a modeless dialog (Find, Replace) are the dialog's: the frame's shortcuts would take Ctrl+V and the like
@@ -44,22 +83,6 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 
 	CreateSimpleStatusBar();
 	m_StatusBar.SubclassWindow(m_hWndStatusBar);
-	int parts[] = { 200, 400, 600, 800, 1000 };
-	m_StatusBar.SetParts(_countof(parts), parts);
-
-	ToolBarButtonInfo const buttons[] = {
-		{ ID_FILE_OPEN, IDI_OPEN },
-		{ ID_FILE_SAVE, IDI_SAVE },
-		{ 0 },
-		{ ID_EDIT_UNDO, IDI_UNDO },
-		{ ID_EDIT_REDO, IDI_REDO },
-		{ 0 },
-		{ ID_EDIT_CUT, IDI_CUT },
-		{ ID_EDIT_COPY, IDI_COPY },
-		{ ID_EDIT_PASTE, IDI_PASTE },
-		{ 0 },
-		{ ID_VIEW_REFRESH, IDI_REFRESH },
-	};
 	CMenuHandle hMenu = GetMenu();
 	if (SecurityHelper::IsRunningElevated()) {
 		hMenu.GetSubMenu(0).DeleteMenu(ID_FILE_RUNASADMINISTRATOR, MF_BYCOMMAND);
@@ -72,7 +95,8 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	AddTemplatesMenu(hMenu.GetSubMenu(0));
 
 	CreateSimpleReBar(ATL_SIMPLE_REBAR_NOBORDER_STYLE);
-	auto tb = ToolbarHelper::CreateAndInitToolBar(m_hWnd, buttons, _countof(buttons));
+	auto tb = ToolbarHelper::CreateAndInitToolBar(m_hWnd, ToolBarButtons, _countof(ToolBarButtons));
+	m_ToolBar = tb;
 
 	AddSimpleReBarBand(tb);
 	UIAddToolBar(tb);
@@ -91,19 +115,15 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	::GetWindowsDirectory(path, _countof(path));
 	::wcscat_s(path, L"\\INF\\");
 	WIN32_FIND_DATA fd;
-	CImageList images;
-	images.Create(16, 16, ILC_COLOR32, 1, 1);
 	if (auto hFind = ::FindFirstFile(path + CString(L"*.inf"), &fd); hFind != INVALID_HANDLE_VALUE) {
 		WORD icon = 0;
 		wcscat_s(path, fd.cFileName);
-		auto hIcon = ::ExtractAssociatedIcon(_Module.GetModuleInstance(), path, &icon);
-		if (hIcon) {
-			images.AddIcon(hIcon);
+		// (the large icon: the image lists make it the small size of their DPI)
+		if (auto hIcon = ::ExtractAssociatedIcon(_Module.GetModuleInstance(), path, &icon))
 			m_InfIcon.Attach(hIcon);
-		}
 		::FindClose(hFind);
 	}
-	m_view.SetImageList(images);
+	ApplyDpi();
 
 	InitMenu(GetMenu());
 	UIAddMenu(GetMenu());
@@ -165,7 +185,6 @@ LRESULT CMainFrame::OnClose(UINT, WPARAM, LPARAM, BOOL& bHandled) {
 LRESULT CMainFrame::OnDestroy(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& bHandled) {
 	auto& settings = AppSettings::Get();
 	settings.SaveWindowPosition(m_hWnd, L"MainWindowPlacement");
-	settings.ViewStatusBar(::IsWindowVisible(m_hWndStatusBar) ? 1 : 0);
 	settings.Save();
 
 	CMessageLoop* pLoop = _Module.GetMessageLoop();
@@ -219,6 +238,25 @@ LRESULT CMainFrame::OnNewFromTemplate(WORD, WORD wID, HWND, BOOL&) {
 	return 0;
 }
 
+LRESULT CMainFrame::OnBrowseDrivers(WORD, WORD, HWND, BOOL&) {
+	for (int i = 0; i < m_view.GetPageCount(); i++)
+		if (dynamic_cast<CDriversView*>(ViewOfPage(i))) {
+			m_view.SetActivePage(i);
+			return 0;
+		}
+	auto pView = new CDriversView(this);
+	pView->Create(m_view, rcDefault, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+	m_view.AddPage(pView->m_hWnd, L"Installed Drivers", 0, static_cast<IView*>(pView));
+	UpdateUI();
+	return 0;
+}
+
+bool CMainFrame::OpenFile(PCWSTR path) {
+	auto ok = DoFileOpen(path);
+	UpdateUI();
+	return ok;
+}
+
 LRESULT CMainFrame::OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
 	CSimpleFileDialog dlg(TRUE, L"inf", nullptr, OFN_EXPLORER | OFN_ENABLESIZING | OFN_FILEMUSTEXIST, L"INF Files\0*.inf;*.inx\0All Files\0*.*\0", m_hWnd);
 	WTLHelper::SuspendHook();
@@ -235,6 +273,8 @@ LRESULT CMainFrame::OnViewStatusBar(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*h
 	auto bVisible = !::IsWindowVisible(m_hWndStatusBar);
 	::ShowWindow(m_hWndStatusBar, bVisible ? SW_SHOWNOACTIVATE : SW_HIDE);
 	UISetCheck(ID_VIEW_STATUS_BAR, bVisible);
+	// (saved now: when the window is destroyed it's hidden already, and so is the status bar by IsWindowVisible)
+	AppSettings::Get().ViewStatusBar(bVisible ? 1 : 0);
 	UpdateLayout();
 	return 0;
 }
@@ -366,6 +406,57 @@ LRESULT CMainFrame::OnOptionsFont(WORD, WORD, HWND, BOOL&) {
 	return 0;
 }
 
+void CMainFrame::ApplyDpi() {
+	UINT dpi = DpiHelper::GetDpi(m_hWnd);
+
+	// the tabs' icon at the small icon size of the DPI
+	auto size = DpiHelper::SmallIconSize(dpi);
+	CImageList images;
+	images.Create(size, size, ILC_COLOR32 | ILC_MASK, 1, 1);
+	if (m_InfIcon)
+		images.AddIcon(m_InfIcon);
+	CImageList old = m_view.SetImageList(images);
+	if (old && old != images)
+		old.Destroy();
+
+	// the status bar: its font and its parts (at 96 DPI: 200 pixels each) for the DPI
+	if (m_StatusBar.IsWindow()) {
+		auto metrics = DpiHelper::GetNonClientMetrics(dpi);
+		CFont font;
+		font.CreateFontIndirect(&metrics.lfStatusFont);
+		m_StatusBar.SetFont(font);
+		if (m_StatusFont)
+			m_StatusFont.DeleteObject();
+		m_StatusFont.Attach(font.Detach());
+		int parts[5];
+		for (int i = 0; i < _countof(parts); i++)
+			parts[i] = DpiHelper::Scale(200 * (i + 1), dpi);
+		m_StatusBar.SetParts(_countof(parts), parts);
+	}
+}
+
+LRESULT CMainFrame::OnDpiChanged(UINT, WPARAM, LPARAM lParam, BOOL&) {
+	// (the tool bar's images when it has handled the change itself, which comes after this)
+	PostMessage(CDpiAware<CMainFrame>::DpiChangedMessage);
+	ApplyDpi();
+	InitMenu(GetMenu());
+	DrawMenuBar();
+	auto rc = reinterpret_cast<RECT const*>(lParam);
+	SetWindowPos(nullptr, rc, SWP_NOZORDER | SWP_NOACTIVATE);
+	UpdateLayout();
+	return 0;
+}
+
+LRESULT CMainFrame::OnDpiChangedPosted(UINT, WPARAM, LPARAM, BOOL&) {
+	// the buttons' images at the DPI, the buttons measured again from them, and the rebar band fitted to them
+	ToolbarHelper::UpdateToolBarImages(m_ToolBar, ToolBarButtons, _countof(ToolBarButtons));
+	m_ToolBar.SetButtonSize(0, 0);
+	m_ToolBar.AutoSize();
+	FitReBarBand(m_hWndToolBar, m_ToolBar);
+	UpdateLayout();
+	return 0;
+}
+
 LRESULT CMainFrame::OnLiveAnalysis(WORD, WORD, HWND, BOOL&) {
 	auto& settings = AppSettings::Get();
 	settings.LiveAnalysis(!settings.LiveAnalysis());
@@ -432,7 +523,7 @@ void CMainFrame::UpdateUI() {
 			ID_WINDOW_CLOSE, ID_WINDOW_CLOSE_ALL, ID_FILE_CLOSE, ID_FILE_SAVE, ID_FILE_SAVE_AS, ID_EDIT_COPY,
 			ID_EDIT_PASTE, ID_EDIT_CUT, ID_EDIT_UNDO, ID_EDIT_REDO, ID_VIEW_REFRESH, ID_EDIT_DELETE,
 			ID_EDIT_FIND, ID_EDIT_REPLACE, ID_EDIT_REPEAT, ID_EDIT_FIND_PREVIOUS, ID_INF_VALIDATE, ID_INF_VALIDATE_WHQL, ID_VIEW_RESULTS,
-			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK
+			ID_EDIT_GOTO_DEFINITION, ID_EDIT_GO_BACK, ID_EDIT_COMPLETE
 		};
 		for (auto id : ids)
 			UIEnable(id, false);

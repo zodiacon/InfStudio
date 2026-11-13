@@ -105,12 +105,16 @@
     <ClCompile Include="EditorFontTests.cpp" />
     <ClCompile Include="InfAnalysisTests.cpp" />
     <ClCompile Include="InfNavigationTests.cpp" />
+    <ClCompile Include="InfCompletionTests.cpp" />
+    <ClCompile Include="InstalledDriversTests.cpp" />
     <ClCompile Include="..\InfStudio\InfLexer.cpp" />
     <ClCompile Include="..\InfStudio\TextFile.cpp" />
     <ClCompile Include="..\InfStudio\InfTemplates.cpp" />
     <ClCompile Include="..\InfStudio\EditorSearch.cpp" />
     <ClCompile Include="..\InfStudio\InfVerif.cpp" />
     <ClCompile Include="..\InfStudio\InfNavigation.cpp" />
+    <ClCompile Include="..\InfStudio\InfLines.cpp" />
+    <ClCompile Include="..\InfStudio\InfCompletion.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\InfCore\InfCore.vcxproj">
